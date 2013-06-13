@@ -269,7 +269,7 @@ legend.labelspacing  : 0.25    # the vertical space between the legend entries i
 #legend.handlelength  : 2.     # the length of the legend lines in fraction of fontsize
 #legend.handleheight  : 0.7     # the height of the legend handle in fraction of fontsize
 #legend.handletextsep : 0.02   # deprecated; the space between the legend line and legend text
-#legend.handletextpad : 0.8    # the space between the legend line and legend text in fraction of fontsize
+legend.handletextpad : 0.4    # the space between the legend line and legend text in fraction of fontsize
 #legend.axespad       : 0.02   # deprecated; the border between the axes and legend edge
 #legend.borderaxespad : 0.5   # the border between the axes and legend edge in fraction of fontsize
 #legend.columnspacing : 2.    # the border between the axes and legend edge in fraction of fontsize

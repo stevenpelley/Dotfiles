@@ -58,12 +58,12 @@ backend      : PDF
 ### LINES
 # See http://matplotlib.sourceforge.net/api/artist_api.html#module-matplotlib.lines for more
 # information on line properties.
-lines.linewidth   : 2.0     # line width in points
+lines.linewidth   : 1.0     # line width in points
 #lines.linestyle   : -       # solid line
 #lines.color       : blue
 #lines.marker      : None    # the default marker
 #lines.markeredgewidth  : 0.5     # the line width around the marker symbol
-lines.markersize  : 10           # markersize, in points
+lines.markersize  : 8           # markersize, in points
 #lines.dash_joinstyle : miter        # miter|round|bevel
 #lines.dash_capstyle : butt          # butt|round|projecting
 #lines.solid_joinstyle : miter       # miter|round|bevel
@@ -115,7 +115,7 @@ lines.antialiased : True         # render lines in antialised (no jaggies)
 # The font.size property is the default font size for text, given in pts.
 # 12pt is the standard value.
 #
-#font.family         : sans-serif
+font.family         : serif
 #font.style          : normal
 #font.variant        : normal
 #font.weight         : medium
@@ -125,7 +125,7 @@ lines.antialiased : True         # render lines in antialised (no jaggies)
 # settings for axes and ticks. Special text sizes can be defined
 # relative to font.size, using the following values: xx-small, x-small,
 # small, medium, large, x-large, xx-large, larger, or smaller
-font.size           : 18.0
+font.size           : 14.0
 #font.serif          : Bitstream Vera Serif, New Century Schoolbook, Century Schoolbook L, Utopia, ITC Bookman, Bookman, Nimbus Roman No9 L, Times New Roman, Times, Palatino, Charter, serif
 #font.sans-serif     : Bitstream Vera Sans, Lucida Grande, Verdana, Geneva, Lucid, Arial, Helvetica, Avant Garde, sans-serif
 #font.cursive        : Apple Chancery, Textile, Zapf Chancery, Sand, cursive
@@ -140,7 +140,7 @@ font.size           : 18.0
 #text.color          : black
 
 ### LaTeX customizations. See http://www.scipy.org/Wiki/Cookbook/Matplotlib/UsingTex
-#text.usetex         : False  # use latex for all text handling. The following fonts
+text.usetex         : True # use latex for all text handling. The following fonts
                               # are supported through the usual rc parameter settings:
                               # new century schoolbook, bookman, times, palatino,
                               # zapf chancery, charter, serif, sans-serif, helvetica,
@@ -202,7 +202,7 @@ font.size           : 18.0
 #axes.hold           : True    # whether to clear the axes by default on
 #axes.facecolor      : white   # axes background color
 #axes.edgecolor      : black   # axes edge color
-axes.linewidth      : 2.0     # edge linewidth
+axes.linewidth      : 1.0     # edge linewidth
 #axes.grid           : False   # display grid or not
 #axes.titlesize      : large   # fontsize of the axes title
 #axes.labelsize      : medium  # fontsize of the x any y labels
@@ -264,7 +264,7 @@ legend.fontsize      : 14
 #legend.markerscale   : 1.0    # the relative size of legend markers vs. original
 # the following dimensions are in axes coords
 #legend.labelsep      : 0.010  # deprecated; the vertical space between the legend entries
-#legend.labelspacing  : 0.5    # the vertical space between the legend entries in fraction of fontsize
+legend.labelspacing  : 0.25    # the vertical space between the legend entries in fraction of fontsize
 #legend.handlelen     : 0.05   # deprecated; the length of the legend lines
 #legend.handlelength  : 2.     # the length of the legend lines in fraction of fontsize
 #legend.handleheight  : 0.7     # the height of the legend handle in fraction of fontsize
@@ -278,7 +278,8 @@ legend.shadow        : False
 
 ### FIGURE
 # See http://matplotlib.sourceforge.net/api/figure_api.html#matplotlib.figure.Figure
-figure.figsize   : 8, 6    # figure size in inches
+#figure.figsize   : 8, 6    # figure size in inches
+figure.figsize   : 3.5, 2.625    # figure size in inches
 #figure.dpi       : 80      # figure dots per inch
 #figure.facecolor : 0.75    # figure facecolor; 0.75 is scalar gray
 #figure.edgecolor : white   # figure edgecolor

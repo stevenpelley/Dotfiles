@@ -279,7 +279,8 @@ legend.shadow        : False
 ### FIGURE
 # See http://matplotlib.sourceforge.net/api/figure_api.html#matplotlib.figure.Figure
 #figure.figsize   : 8, 6    # figure size in inches
-figure.figsize   : 3.5, 2.625    # figure size in inches
+#figure.figsize   : 3.5, 2.625    # figure size in inches
+figure.figsize   : 3.5, 3    # figure size in inches
 #figure.dpi       : 80      # figure dots per inch
 #figure.facecolor : 0.75    # figure facecolor; 0.75 is scalar gray
 #figure.edgecolor : white   # figure edgecolor

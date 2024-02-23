@@ -66,7 +66,13 @@ install_commons() {
   # install oh-my-bash
   bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)" --unattended
 
-  # TODO if have python then install jc, jello, jellox
+  # if have python then install jc, jello, jellex
+  if which python3 > /dev/null && which brew > /dev/null; then
+    brew install jc jello pipx
+    pipx install jellex
+  elif which pip3 > /dev/null; then
+    pip install jc jello jellex
+  fi
 }
 
 case "$1" in

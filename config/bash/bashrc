@@ -3,10 +3,13 @@ set -o vi
 export CLICOLOR=1
 
 if [ -d /opt/homebrew/bin ]; then
-  export PATH="/opt/homebrew/bin/:$PATH"
+  export PATH="/opt/homebrew/bin:$PATH"
 fi
 if [ -d ~/bin ]; then
-  export PATH="$HOME/bin/:$PATH"
+  export PATH="$HOME/bin:$PATH"
+fi
+if [ -d ~/.local/bin ]; then
+  export PATH="$HOME/.local/bin:$PATH"
 fi
 if [ -d ~/Library/Python/3.8/bin ]; then
   export PATH="$PATH:$HOME/Library/Python/3.8/bin"

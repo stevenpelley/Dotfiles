@@ -36,7 +36,8 @@ link_configs() {
     if [ -L ~/.$file ]
     then
       rm ~/.$file
-    else
+    elif [ -e ~/.$file ]
+    then
       mv ~/.$file $olddir/
     fi
 
@@ -53,7 +54,8 @@ link_configs() {
     if [ -L ~/.config/$configdir ]
     then
       rm ~/.config/$configdir
-    else
+    elif [ -e ~/.config/$configdir ]
+    then
       mv ~/.config/$configdir $oldconfigdir/
     fi
 

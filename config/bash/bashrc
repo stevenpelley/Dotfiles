@@ -1,0 +1,44 @@
+set -o vi
+# forces grep to use color even when accepting input from a pipe
+export CLICOLOR=1
+
+if [ -d /opt/homebrew/bin ]; then
+  export PATH="/opt/homebrew/bin/:$PATH"
+fi
+if [ -d ~/bin ]; then
+  export PATH="$HOME/bin/:$PATH"
+fi
+if [ -d ~/Library/Python/3.8/bin ]; then
+  export PATH="$PATH:$HOME/Library/Python/3.8/bin"
+fi
+
+# use the best vi available
+if which nvim > /dev/null; then
+  export EDITOR="nvim"
+  alias vim='nvim'
+  alias vi='nvim'
+elif which vim > /dev/null; then
+  export EDITOR="vim"
+  alias vi='vim'
+elif which vi > /dev/null; then
+  export EDITOR="vi"
+fi
+
+if which pdftk > /dev/null; then
+  function pdftk_shuffle {
+    pdftk A="$1" B="$2" shuffle A Bend-1 output "$3"
+  }
+fi
+
+# used for external fish-shell devcontainer.  No better way to give an external
+# value to devcontainer.json
+if [ -d ~/fish-shell-devcontainer ]; then
+  export FISH_REPO_DIR=~/fish-shell
+fi
+
+if [ -f "$HOME/.cargo/env" ]; then
+  . "$HOME/.cargo/env"
+fi
+
+# ssh
+# export SSH_KEY_PATH="~/.ssh/rsa_id"

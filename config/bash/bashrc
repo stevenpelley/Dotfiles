@@ -25,6 +25,7 @@ elif which vim > /dev/null; then
   alias vi='vim'
 elif which vi > /dev/null; then
   export EDITOR="vi"
+  alias vim='vi'
 fi
 
 if which pdftk > /dev/null; then

@@ -70,10 +70,10 @@ install_commons() {
 
   # if have python then install jc, jello, jellex
   if which python3 > /dev/null && which brew > /dev/null; then
-    brew install jc jello pipx
-    pipx install jellex
+    brew install pipx
+    pipx install jc jello jellex
   elif which pip3 > /dev/null; then
-    pip install jc jello jellex
+    pipx install jc jello jellex
   fi
 }
 

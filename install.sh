@@ -9,7 +9,7 @@ link_configs() {
   olddir=~/Dotfiles_old             # old dotfiles backup directory
   oldconfigdir=~/Config_old
   files="bashrc vimrc bash_profile"    # list of files/folders to symlink in homedir
-  config_dirs="bash fish nvim nvim-trial"
+  config_dirs="bash fish nvim nvim-trial zellij"
 
   ##########
 
@@ -64,7 +64,41 @@ link_configs() {
   done
 }
 
+install_zellij() {
+  if which zellij > /dev/null; then
+    return
+  fi
+  if which brew > /dev/null; then
+    brew install zellij
+    return
+  fi
+  # Linux: static binary from GitHub releases (not in apt)
+  case "$(uname -m)" in
+    x86_64)          zj_arch="x86_64" ;;
+    aarch64 | arm64) zj_arch="aarch64" ;;
+    *)
+      echo "zellij: unsupported arch $(uname -m), skipping"
+      return 1
+      ;;
+  esac
+  version=$(curl -fsSL https://api.github.com/repos/zellij-org/zellij/releases/latest |
+    grep -m1 '"tag_name"' | cut -d'"' -f4)
+  if [ -z "$version" ]; then
+    echo "zellij: could not determine latest release, skipping"
+    return 1
+  fi
+  url="https://github.com/zellij-org/zellij/releases/download/${version}/zellij-${zj_arch}-unknown-linux-musl.tar.gz"
+  tmpdir=$(mktemp -d)
+  curl -fsSL "$url" | tar xz -C "$tmpdir"
+  mkdir -p ~/.local/bin
+  install -m755 "$tmpdir/zellij" ~/.local/bin/zellij
+  rm -rf "$tmpdir"
+  ~/.local/bin/zellij --version
+}
+
 install_commons() {
+  install_zellij
+
   # install oh-my-bash
   bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)" --unattended
 

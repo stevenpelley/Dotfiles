@@ -90,9 +90,13 @@ require("lazy").setup({
       { "<leader>fc", function() require("telescope.builtin").lsp_incoming_calls() end, desc = "Incoming calls" },
       { "<leader>fC", function() require("telescope.builtin").lsp_outgoing_calls() end, desc = "Outgoing calls" },
       { "<leader>fd", function() require("telescope.builtin").diagnostics() end, desc = "Diagnostics" },
+      { "<leader>fh", function() require("telescope.builtin").help_tags() end, desc = "Search help" },
+      { "<leader>fk", function() require("telescope.builtin").keymaps() end, desc = "Search keymaps" },
     },
   },
   -- Git: inline hunk markers + commit/history diff review
+  -- Discoverability: popup menus of available keymaps while you wait mid-keypress
+  { "folke/which-key.nvim", opts = {} },
   {
     "lewis6991/gitsigns.nvim",
     opts = {

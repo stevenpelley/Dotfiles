@@ -12,6 +12,9 @@
 default_mode "locked"
 keybinds clear-defaults=true {
     normal {
+        // after Ctrl+g (zellij command state): Option+g sends Ctrl+G to the
+        // pane, then returns to locked so you're back in the app
+        bind "Alt g" { Write 7; SwitchToMode "Locked"; }
     }
     locked {
         bind "Ctrl g" { SwitchToMode "Normal"; }

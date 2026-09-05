@@ -9,7 +9,7 @@ link_configs() {
   olddir=~/Dotfiles_old             # old dotfiles backup directory
   oldconfigdir=~/Config_old
   files="bashrc vimrc bash_profile"    # list of files/folders to symlink in homedir
-  config_dirs="bash fish nvim"
+  config_dirs="bash fish nvim nvim-trial"
 
   ##########
 

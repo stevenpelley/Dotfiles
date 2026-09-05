@@ -1,10 +1,12 @@
 // Zellij config — "unlock-first (non-colliding)" keybinding preset, zellij
 // v0.45.1, plus one addition:
 //
-//   locked mode: Alt+g sends a literal Ctrl+G (byte 7 / BEL) to the focused
-//   pane. Ctrl+G is zellij's own unlock key, so without this there is no way
-//   to send it to the terminal — and CLI agents (omp/oh-my-pi and friends)
-//   use Ctrl+G to open the current prompt in $EDITOR.
+//   normal mode (after Ctrl+g): Alt+g sends a literal Ctrl+G (byte 7 / BEL)
+//   to the focused pane and returns to locked. Ctrl+G is zellij's own unlock
+//   key, so the chord is the only way to send it to the terminal — CLI agents
+//   (omp/oh-my-pi and friends) use Ctrl+G to open the current prompt in
+//   $EDITOR. Deliberately NOT bound in locked mode, so real Alt+g still
+//   reaches applications.
 //
 // Materialized from default-plugins/configuration/src/presets.rs
 // (unlock_first_keybinds) in the zellij repo at v0.45.1.
@@ -18,7 +20,6 @@ keybinds clear-defaults=true {
     }
     locked {
         bind "Ctrl g" { SwitchToMode "Normal"; }
-        bind "Alt g" { Write 7; }
     }
     resize {
         bind "r" { SwitchToMode "Normal"; }

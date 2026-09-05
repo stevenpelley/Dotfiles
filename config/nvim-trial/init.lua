@@ -116,7 +116,10 @@ require("lazy").setup({
       end,
     },
   },
-  { "sindrets/diffview.nvim", cmd = { "DiffviewOpen", "DiffviewFileHistory" } },
+  -- NOT lazy-loaded: its doc/ must stay on runtimepath for :help to resolve
+  -- its tags (telescope help_tags lists docs from unloaded plugins, but
+  -- :help can't open them until the plugin loads -> E661)
+  { "sindrets/diffview.nvim" },
 }, {
   -- everything lives under the nvim-trial data dir; nuke it to reset
   install = { missing = true },

@@ -123,12 +123,22 @@ require("lazy").setup({
   checker = { enabled = false },
 })
 
--- Call hierarchy (the one LSP feature without a default mapping in 0.11) ------
-vim.keymap.set("n", "gci", vim.lsp.buf.incoming_calls, { desc = "LSP incoming calls" })
-vim.keymap.set("n", "gco", vim.lsp.buf.outgoing_calls, { desc = "LSP outgoing calls" })
-
--- Built-in defaults that are worth knowing (no config needed): gd, gr, gO,
--- gri, grr, grn, K, [d, ]d -- see :h default-mappings.
+-- LSP keymaps beyond nvim 0.11's defaults (grn/gra/grr/gri/grt/gO). Mapped
+-- buffer-locally on LspAttach so non-LSP buffers keep vim's built-in gd/K.
+local lsp_augroup = vim.api.nvim_create_augroup("nvim-trial-lsp-maps", { clear = true })
+vim.api.nvim_create_autocmd("LspAttach", {
+  group = lsp_augroup,
+  callback = function(args)
+    local map = function(lhs, rhs, desc)
+      vim.keymap.set("n", lhs, rhs, { buffer = args.buf, desc = desc })
+    end
+    map("gd", vim.lsp.buf.definition, "LSP: go to definition")
+    map("gD", vim.lsp.buf.declaration, "LSP: go to declaration")
+    map("K", vim.lsp.buf.hover, "LSP: hover")
+    map("gci", vim.lsp.buf.incoming_calls, "LSP: incoming calls")
+    map("gco", vim.lsp.buf.outgoing_calls, "LSP: outgoing calls")
+  end,
+})
 
 -- Floating lazygit -----------------------------------------------------------
 local lazygit_win = nil

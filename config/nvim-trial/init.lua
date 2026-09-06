@@ -93,6 +93,7 @@ require("lazy").setup({
       { "<leader>fd", function() require("telescope.builtin").diagnostics() end, desc = "Diagnostics" },
       { "<leader>fh", function() require("telescope.builtin").help_tags() end, desc = "Search help" },
       { "<leader>fk", function() require("telescope.builtin").keymaps() end, desc = "Search keymaps" },
+      { "<leader>ft", function() require("telescope.builtin").commands() end, desc = "Tools (all commands)" },
     },
   },
   -- Git: inline hunk markers + commit/history diff review
@@ -174,6 +175,31 @@ local function lazygit_toggle()
   vim.cmd("startinsert")
 end
 vim.keymap.set("n", "<leader>gg", lazygit_toggle, { desc = "Toggle lazygit" })
+
+-- Floating netrw explorer (toggles over any tab) -----------------------------
+vim.g.netrw_browse_split = 4 -- files opened from netrw go to the previous window
+_G.NvimTrialExploreToggle = function()
+  for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local cfg = vim.api.nvim_win_get_config(w)
+    if cfg.relative ~= "" and vim.bo[vim.api.nvim_win_get_buf(w)].filetype == "netrw" then
+      vim.api.nvim_win_close(w, true)
+      return
+    end
+  end
+  local width = math.floor(vim.o.columns * 0.6)
+  local height = math.floor(vim.o.lines * 0.85)
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_open_win(buf, true, {
+    relative = "editor",
+    width = width,
+    height = height,
+    col = math.floor((vim.o.columns - width) / 2),
+    row = math.floor((vim.o.lines - height) / 2),
+    border = "rounded",
+  })
+  vim.cmd("Ex") -- netrw takes over the new float
+end
+vim.keymap.set("n", "<leader>fe", _G.NvimTrialExploreToggle, { desc = "Toggle file explorer" })
 
 -- LSP hover border (cosmetic) ------------------------------------------------
 vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(vim.lsp.handlers.hover, { border = "rounded" })

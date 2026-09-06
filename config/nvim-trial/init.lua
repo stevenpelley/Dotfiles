@@ -16,6 +16,8 @@ vim.opt.undofile = true
 vim.opt.breakindent = true
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
+-- colorful variant of the default scheme; keeps the terminal background
+vim.cmd.colorscheme("vim")
 
 -- Bootstrap lazy.nvim --------------------------------------------------------
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"

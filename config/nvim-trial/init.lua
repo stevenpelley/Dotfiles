@@ -7,7 +7,6 @@ vim.g.maplocalleader = " "
 
 -- Options -------------------------------------------------------------------
 vim.opt.number = true
-vim.opt.relativenumber = true
 vim.opt.termguicolors = true
 vim.opt.signcolumn = "yes" -- stable gutter; no layout shift from diagnostics
 vim.opt.updatetime = 250

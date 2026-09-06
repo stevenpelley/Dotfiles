@@ -1,8 +1,15 @@
 #!/bin/bash
-############################
-# .make.sh
-# This script creates symlinks from the home directory to any desired dotfiles in ~/Dotfiles
-############################
+########################
+# Dotfiles installer
+#
+#   bash install.sh link     # symlink home files and ~/.config/* into this repo
+#   bash install.sh install  # install tooling (zellij, oh-my-bash, pipx tools)
+#   bash install.sh all      # install then link (order matters: oh-my-bash
+#                            # replaces ~/.bashrc, so linking must come after)
+#
+# link moves any pre-existing files to ~/Dotfiles_old / ~/Config_old, then
+# creates symlinks. Safe to re-run.
+########################
 
 link_configs() {
   dir=~/Dotfiles                    # dotfiles directory

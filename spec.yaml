@@ -1,0 +1,37 @@
+schemaVersion: "2"
+kind: mixin
+name: dotfiles
+displayName: Personal dotfiles (stevenpelley)
+description: >-
+  Clones the Dotfiles repository to /home/agent/Dotfiles and runs its installer,
+  linking bash/vim/nvim-trial/zellij configuration into $HOME. Provides the
+  nvtrial alias, oh-my-bash, the zellij binary (unlock-first keybind preset with
+  Ctrl+G passthrough so coding agents can open their prompt editor), and pipx
+  tools (jc, jello, jellex). Kit upgrades inside a running sandbox are simply
+  `git pull` in /home/agent/Dotfiles followed by `bash install.sh link`.
+setup:
+  install:
+    # Install commands run as root; drop to the agent user so $HOME-resolved
+    # installs (oh-my-bash, pipx, symlinks) land in /home/agent.
+    - command: |
+        su -l agent -c '
+          set -e
+          test -d "$HOME/Dotfiles/.git" || git clone https://github.com/stevenpelley/Dotfiles "$HOME/Dotfiles"
+          git -C "$HOME/Dotfiles" pull --ff-only || echo "WARN: git pull failed; keeping existing clone"
+          bash "$HOME/Dotfiles/install.sh" all
+        '
+permissions:
+  network:
+    allow:
+      # kit clone inside the sandbox + zellij release download
+      # (api for the latest-release lookup; both GitHub asset hosts are
+      # required — GitHub rotated release downloads to release-assets.*)
+      - github.com
+      - api.github.com
+      - objects.githubusercontent.com
+      - release-assets.githubusercontent.com
+      # oh-my-bash installer
+      - raw.githubusercontent.com
+      # pipx installs (jc, jello, jellex)
+      - pypi.org
+      - files.pythonhosted.org

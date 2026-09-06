@@ -102,6 +102,21 @@ install_zellij() {
   rm -rf "$tmpdir"
   ~/.local/bin/zellij --version
 }
+ensure_pipx_linux() {
+  command -v pipx > /dev/null && return 0
+  command -v apt-get > /dev/null || return 0
+  if [ "$(id -u)" = "0" ]; then
+    SUDO=""
+  elif command -v sudo > /dev/null; then
+    SUDO="sudo"
+  else
+    echo "pipx: no apt privileges to install it, skipping"
+    return 0
+  fi
+  # DPkg::Lock::Timeout makes apt wait for the package lock instead of failing
+  $SUDO apt-get update -o DPkg::Lock::Timeout=10 && \
+    $SUDO apt-get install -y -o DPkg::Lock::Timeout=10 pipx
+}
 
 install_commons() {
   install_zellij

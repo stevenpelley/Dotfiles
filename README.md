@@ -53,6 +53,37 @@ Notes for machine-specific tooling in `install_commons`: prefer brew on macOS;
 on Linux prefer apt, falling back to GitHub release binaries installed into
 `~/.local/bin` (which `config/bash/bashrc` puts on PATH).
 
+Docker sandbox kit
+------------------
+
+This repo is also a [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/)
+**mixin kit** (`spec.yaml`, thin-kit pattern): provisioning the kit clones this
+repository into `/home/agent/Dotfiles` and runs `install.sh all`. Nothing is
+duplicated — the kit's install command installs from git, so upgrades inside an
+existing sandbox stay `git pull && bash install.sh link`.
+
+```bash
+# one-time host prerequisite: allowlist this kit's Git source
+# (the setting REPLACES the list — keep any existing entries)
+sbx settings set kit.allowedSources '["docker.io/","github.com/stevenpelley/"]'
+
+# validate locally, then use via an environment file
+sbx kit validate .
+sbx env run .sbxenv.yaml dotfiles.sbxenv.yaml
+```
+
+`dotfiles.sbxenv.yaml` is a reference/example environment file (merge it after
+your own `.sbxenv.yaml`, which supplies `agent` and `workspace`). The hosts in
+`permissions.network.allow` in `spec.yaml` must cover everything `install.sh`
+downloads at provision time (github.com, api.github.com, both GitHub asset
+hosts, raw.githubusercontent.com, pypi.org, files.pythonhosted.org); extend it
+when adding install steps. Kit install commands run as **root** — `spec.yaml`
+drops to the `agent` user before running the installer.
+
+When editing `install.sh` or adding download steps: every apt-get invocation
+must include `-o DPkg::Lock::Timeout=10`, and any new download host must be
+added to `spec.yaml`'s network allowlist.
+
 Agent context
 -------------
 

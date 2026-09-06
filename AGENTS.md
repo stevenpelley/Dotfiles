@@ -15,6 +15,14 @@ ssh disconnects but not VM restarts).
 
 - `bashrc`, `bash_profile`, `vimrc` — linked into `$HOME`
 - `install.sh` — `link` (symlinks), `install` (tooling: zellij, oh-my-bash, pipx tools), `all`
+- `spec.yaml` — Docker Sandboxes mixin kit (thin-kit pattern): its install
+  command clones this repo into `/home/agent/Dotfiles` and runs `install.sh
+  all` as the `agent` user. No files are duplicated — the repo stays the
+  single source of truth. `dotfiles.sbxenv.yaml` is a reference/example env
+  file, not consumed by the kit.
+- Docker's kit-reference and kit-examples doc pages are 404s; the working
+  schema came from `docker/sbx-kits-contrib` on GitHub (`schemaVersion: "2"`,
+  `kind: mixin`, ...). Validate with `sbx kit validate .` (host-side).
 - `config/bash`, `config/fish` — shell setup; `nvtrial` alias defined here
 - `config/nvim` — legacy bridge (`init.vim` sources `~/.vimrc`); do not extend it
 - `config/nvim-trial` — experimental Neovim config, isolated via
@@ -55,6 +63,14 @@ ssh disconnects but not VM restarts).
   `gd`/`gD`/`K`/`gci`/`gco` are mapped buffer-locally on `LspAttach` in the
   trial config. which-key only lists mappings — built-in vim commands never
   appear in its menus.
+- Every `apt-get` invocation must include `-o DPkg::Lock::Timeout=10` so apt
+  waits for the package lock instead of failing.
+- Any new download host used by `install.sh` must be added to the
+  `permissions.network.allow` list in `spec.yaml` (currently github.com,
+  api.github.com, objects.githubusercontent.com, release-assets.githubusercontent.com,
+  raw.githubusercontent.com, pypi.org, files.pythonhosted.org) or provisioning
+  fails on fresh sandboxes. Kit install commands run as **root** — anything
+  that must land in `/home/agent` goes through `su -l agent -c '...'`.
 
 ## Conventions
 

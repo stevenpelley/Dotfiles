@@ -1,0 +1,23 @@
+# Example sandbox environment file for the Dotfiles kit.
+#
+# This is a REFERENCE file — it is not used by this repository or by the kit
+# itself. Copy it beside your project (outside any directory you mount into
+# the sandbox) and merge it with your own environment definition:
+#
+#   sbx env run .sbxenv.yaml dotfiles.sbxenv.yaml
+#
+# The first file must define `agent` (and, if desired, `workspace`); this file
+# only adds the Dotfiles kit. The kit itself clones
+# https://github.com/stevenpelley/Dotfiles into /home/agent/Dotfiles and runs
+# `install.sh all` — see spec.yaml.
+#
+# One-time host prerequisite: allowlist this kit's Git source (default is
+# Docker Hub only). The setting REPLACES the whole list, so keep existing
+# entries:
+#
+#   sbx settings set kit.allowedSources '["docker.io/","github.com/stevenpelley/"]'
+schemaVersion: "1"
+kits:
+  # Thin kit: clones the repo and runs install.sh all. `ref` pins the branch;
+  # drop it to track the default branch at creation time.
+  - git+https://github.com/stevenpelley/Dotfiles#ref=master

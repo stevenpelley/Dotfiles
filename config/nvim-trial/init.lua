@@ -64,6 +64,30 @@ require("lazy").setup({
   {
     "neovim/nvim-lspconfig",
     config = function()
+      -- pyright: prefer the project's own interpreter so imports resolve
+      -- against its dependencies. Order: <root>/.venv, then $VIRTUAL_ENV,
+      -- then pyright's default (its bundled/environment python).
+      -- Settings must be mutated on the client in on_init: nvim sends them
+      -- via didChangeConfiguration *after* initialize, so mutating the
+      -- initialize params in before_init has no effect.
+      vim.lsp.config("pyright", {
+        on_init = function(client)
+          local root = client.config.root_dir
+          local candidates = {
+            root and (root .. "/.venv/bin/python"),
+            vim.env.VIRTUAL_ENV and (vim.env.VIRTUAL_ENV .. "/bin/python"),
+            vim.fn.getcwd() .. "/.venv/bin/python",
+          }
+          for _, path in ipairs(candidates) do
+            if path and vim.uv.fs_stat(path) then
+              client.config.settings = client.config.settings or {}
+              client.config.settings.python = client.config.settings.python or {}
+              client.config.settings.python.pythonPath = path
+              break
+            end
+          end
+        end,
+      })
       vim.lsp.enable({ "pyright", "ruff", "vtsls" })
     end,
   },

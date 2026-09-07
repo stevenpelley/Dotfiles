@@ -59,6 +59,15 @@ ssh disconnects but not VM restarts).
   verbatim. The only intentional customization is in `normal` mode:
   `Alt+g` → `Write 7` (passes Ctrl+G to the focused pane so coding agents can
   open their prompt editor). It is deliberately **not** bound in `locked` mode.
+- `install.sh` installs Neovim as a pinned v0.11 release from GitHub into
+  `~/.local` (apt nvim is < 0.11 on many distros; nvim-trial requires >= 0.11).
+  Bump `NVIM_VERSION` in `install_nvim` only together with the treesitter pin
+  in `config/nvim-trial/init.lua` (the v0.10.0 legacy plugin API is only
+  verified against 0.11).
+- nvim 0.11 sends LSP `settings` via `workspace/didChangeConfiguration` after
+  initialize — mutating initialize params in `before_init` is a no-op. To
+  affect server settings (e.g. pyright's `pythonPath`), mutate
+  `client.config.settings` in `on_init`.
 - nvim 0.11's default LSP maps are `grn/gra/grr/gri/grt/gO/Ctrl-S` only;
   `gd`/`gD`/`K`/`gci`/`gco` are mapped buffer-locally on `LspAttach` in the
   trial config. which-key only lists mappings — built-in vim commands never

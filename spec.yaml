@@ -35,3 +35,5 @@ permissions:
       # pipx installs (jc, jello, jellex)
       - pypi.org
       - files.pythonhosted.org
+      # pyright/vtsls/typescript via npm (install_lsps)
+      - registry.npmjs.org

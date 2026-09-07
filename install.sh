@@ -71,6 +71,63 @@ link_configs() {
   done
 }
 
+nvim_version_ok() {
+  command -v nvim > /dev/null || return 1
+  local v
+  v=$(nvim --version | sed -n '1s/^NVIM v//p' | cut -d. -f1,2)
+  [ "$(printf '%s\n0.11\n' "$v" | sort -V | tail -1)" = "$v" ]
+}
+
+install_nvim() {
+  if nvim_version_ok; then
+    return 0
+  fi
+  if which brew > /dev/null; then
+    brew install neovim
+    return 0
+  fi
+  # Linux: apt ships nvim < 0.11 on many distros (nvim-trial requires >= 0.11),
+  # so install the pinned official release into ~/.local. Bump NVIM_VERSION
+  # together with config/nvim-trial (treesitter pin expects 0.11).
+  NVIM_VERSION=v0.11.6
+  case "$(uname -m)" in
+    x86_64)          nv_arch="x86_64" ;;
+    aarch64 | arm64) nv_arch="arm64" ;;
+    *)
+      echo "nvim: unsupported arch $(uname -m), skipping"
+      return 1
+      ;;
+  esac
+  url="https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-${nv_arch}.tar.gz"
+  tmpdir=$(mktemp -d)
+  curl -fsSL "$url" | tar xz -C "$tmpdir"
+  mkdir -p ~/.local/opt ~/.local/bin
+  rm -rf ~/.local/opt/nvim
+  mv "$tmpdir/nvim-linux-${nv_arch}" ~/.local/opt/nvim
+  rm -rf "$tmpdir"
+  ln -sf ~/.local/opt/nvim/bin/nvim ~/.local/bin/nvim
+  ~/.local/bin/nvim --version | head -1
+}
+
+install_lsps() {
+  # nvim-trial needs pyright, vtsls (+ typescript) and ruff on PATH
+  if ! which pyright-langserver > /dev/null; then
+    if which brew > /dev/null; then
+      brew install pyright
+    elif which npm > /dev/null; then
+      npm install -g pyright
+    else
+      echo "install_lsps: no brew/npm; cannot install pyright"
+    fi
+  fi
+  if ! which vtsls > /dev/null && which npm > /dev/null; then
+    npm install -g @vtsls/language-server typescript
+  fi
+  if ! which ruff > /dev/null && which pipx > /dev/null; then
+    pipx install ruff
+  fi
+}
+
 install_zellij() {
   if which zellij > /dev/null; then
     return
@@ -102,23 +159,32 @@ install_zellij() {
   rm -rf "$tmpdir"
   ~/.local/bin/zellij --version
 }
-ensure_pipx_linux() {
-  command -v pipx > /dev/null && return 0
+ensure_linux_tooling() {
+  # best-effort bootstrap for fresh sandboxes; every apt call waits for the
+  # package lock instead of failing
   command -v apt-get > /dev/null || return 0
   if [ "$(id -u)" = "0" ]; then
     SUDO=""
   elif command -v sudo > /dev/null; then
     SUDO="sudo"
   else
-    echo "pipx: no apt privileges to install it, skipping"
+    echo "linux tooling: no apt privileges, skipping"
     return 0
   fi
-  # DPkg::Lock::Timeout makes apt wait for the package lock instead of failing
+  local missing=""
+  local pkg
+  for pkg in pipx git curl build-essential; do
+    command -v "$pkg" > /dev/null || missing="$missing $pkg"
+  done
+  [ -z "$missing" ] && return 0
   $SUDO apt-get update -o DPkg::Lock::Timeout=10 && \
-    $SUDO apt-get install -y -o DPkg::Lock::Timeout=10 pipx
+    $SUDO apt-get install -y -o DPkg::Lock::Timeout=10 $missing
 }
 
 install_commons() {
+  ensure_linux_tooling
+  install_nvim
+  install_lsps
   install_zellij
 
   # install oh-my-bash
@@ -127,9 +193,9 @@ install_commons() {
   # if have python then install jc, jello, jellex
   if which python3 > /dev/null && which brew > /dev/null; then
     brew install pipx
-    pipx install jc jello jellex
+    pipx install jc jello jellex ruff
   elif which pip3 > /dev/null; then
-    pipx install jc jello jellex
+    pipx install jc jello jellex ruff
   fi
 }
 

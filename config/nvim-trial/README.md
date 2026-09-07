@@ -27,11 +27,22 @@ rm -rf ~/.local/share/nvim-trial ~/.local/state/nvim-trial ~/.cache/nvim-trial
 
 ## Requirements
 
-- Neovim **>= 0.11** (uses native `vim.lsp.config`/`vim.lsp.enable`)
-- `pyright` + `ruff` (Python), `vtsls` (TypeScript/JS) on PATH — e.g.
-  `npm i -g pyright @vtsls/language-server typescript && pipx install ruff`
+- Neovim **>= 0.11** (uses native `vim.lsp.config`/`vim.lsp.enable`).
+  `install.sh` installs a pinned nvim 0.11 release into `~/.local` on Linux
+  (apt ships < 0.11 on many distros); brew on macOS.
+- `pyright` + `ruff` (Python), `vtsls` (TypeScript/JS) on PATH — installed
+  automatically by `install.sh` (npm / pipx / brew).
 - `git` and a C compiler (treesitter compiles parsers on first run)
 - `lazygit` (optional, for `<leader>gg`)
+
+## Python and TypeScript environments
+
+- **pyright** prefers the project's own interpreter: `<project root>/.venv/bin/python`
+  if present (or `$VIRTUAL_ENV`), so imports resolve against the venv's
+  dependencies. Without either, pyright falls back to its default python.
+- **vtsls** is the TypeScript analogue and needs no configuration: tsserver
+  automatically loads the workspace's own `node_modules/typescript` when
+  present, falling back to the globally installed one.
 
 ## Plugins
 

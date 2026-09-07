@@ -88,6 +88,24 @@ require("lazy").setup({
           end
         end,
       })
+      -- ruff: same venv preference, implemented differently — the Rust ruff
+      -- server has no interpreter setting, so launch the project's own ruff
+      -- binary when the venv has one (falls back to the global ruff). Server
+      -- mode stabilized in ruff 0.5.3, so older pinned versions are ignored.
+      vim.lsp.config("ruff", {
+        cmd = function(dispatchers)
+          local exe = "ruff"
+          local venv_ruff = vim.fn.getcwd() .. "/.venv/bin/ruff"
+          if vim.uv.fs_stat(venv_ruff) then
+            local v = vim.fn.system({ venv_ruff, "--version" }):match("ruff (%S+)")
+            local parsed = v and vim.version.parse(v)
+            if parsed and vim.version.gt(parsed, vim.version.parse("0.5.2")) then
+              exe = venv_ruff
+            end
+          end
+          return vim.lsp.rpc.start({ exe, "server" }, dispatchers)
+        end,
+      })
       vim.lsp.enable({ "pyright", "ruff", "vtsls" })
     end,
   },

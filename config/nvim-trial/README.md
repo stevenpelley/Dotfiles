@@ -43,6 +43,12 @@ rm -rf ~/.local/share/nvim-trial ~/.local/state/nvim-trial ~/.cache/nvim-trial
 - **vtsls** is the TypeScript analogue and needs no configuration: tsserver
   automatically loads the workspace's own `node_modules/typescript` when
   present, falling back to the globally installed one.
+- **ruff** uses the project's own binary when the venv has one
+  (`<project root>/.venv/bin/ruff`, version >= 0.5.3), falling back to the
+  globally installed ruff. Note the Rust ruff server has no interpreter
+  setting — the venv preference is implemented by launching the venv's ruff.
+  Ruff itself doesn't resolve imports (that's pyright's job), so this only
+  controls which ruff version and configuration engine runs.
 
 ## Plugins
 

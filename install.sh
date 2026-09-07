@@ -15,7 +15,7 @@ link_configs() {
   dir=~/Dotfiles                    # dotfiles directory
   olddir=~/Dotfiles_old             # old dotfiles backup directory
   oldconfigdir=~/Config_old
-  files="bashrc vimrc bash_profile"    # list of files/folders to symlink in homedir
+  files="bashrc vimrc bash_profile sbxenv.yaml"    # list of files/folders to symlink in homedir
   config_dirs="bash fish nvim nvim-trial zellij"
 
   ##########
@@ -40,16 +40,22 @@ link_configs() {
 
   # move any existing dotfiles in homedir to dotfiles_old directory, then create symlinks
   for file in $files; do
-    if [ -L ~/.$file ]
+    # home target defaults to .<file>; sbxenv.yaml links without a leading dot
+    case $file in
+      sbxenv.yaml) target=$file ;;
+      *) target=.$file ;;
+    esac
+
+    if [ -L ~/$target ]
     then
-      rm ~/.$file
-    elif [ -e ~/.$file ]
+      rm ~/$target
+    elif [ -e ~/$target ]
     then
-      mv ~/.$file $olddir/
+      mv ~/$target $olddir/
     fi
 
     echo "Creating symlink to $file in home directory."
-    ln -s $dir/$file ~/.$file
+    ln -s $dir/$file ~/$target
   done
 
   # change to the .config directory

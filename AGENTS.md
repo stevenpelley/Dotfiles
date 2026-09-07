@@ -13,13 +13,15 @@ ssh disconnects but not VM restarts).
 
 ## Layout
 
-- `bashrc`, `bash_profile`, `vimrc` — linked into `$HOME`
+- `bashrc`, `bash_profile`, `vimrc` — linked into `$HOME`; `sbxenv.yaml`
+  linked to `~/sbxenv.yaml` (no leading dot)
 - `install.sh` — `link` (symlinks), `install` (tooling: zellij, oh-my-bash, pipx tools), `all`
 - `spec.yaml` — Docker Sandboxes mixin kit (thin-kit pattern): its install
   command clones this repo into `/home/agent/Dotfiles` and runs `install.sh
   all` as the `agent` user. No files are duplicated — the repo stays the
-  single source of truth. `dotfiles.sbxenv.yaml` is a reference/example env
-  file, not consumed by the kit.
+  single source of truth. `sbxenv.yaml` is a reference/example env file,
+  not consumed by the kit; `link` symlinks it to `~/sbxenv.yaml` (no
+  leading dot, unlike the other linked files).
 - Docker's kit-reference and kit-examples doc pages are 404s; the working
   schema came from `docker/sbx-kits-contrib` on GitHub (`schemaVersion: "2"`,
   `kind: mixin`, ...). Validate with `sbx kit validate .` (host-side).

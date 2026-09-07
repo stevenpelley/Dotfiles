@@ -40,22 +40,16 @@ link_configs() {
 
   # move any existing dotfiles in homedir to dotfiles_old directory, then create symlinks
   for file in $files; do
-    # home target defaults to .<file>; sbxenv.yaml links without a leading dot
-    case $file in
-      sbxenv.yaml) target=$file ;;
-      *) target=.$file ;;
-    esac
-
-    if [ -L ~/$target ]
+    if [ -L ~/.$file ]
     then
-      rm ~/$target
-    elif [ -e ~/$target ]
+      rm ~/.$file
+    elif [ -e ~/.$file ]
     then
-      mv ~/$target $olddir/
+      mv ~/.$file $olddir/
     fi
 
     echo "Creating symlink to $file in home directory."
-    ln -s $dir/$file ~/$target
+    ln -s $dir/$file ~/.$file
   done
 
   # change to the .config directory

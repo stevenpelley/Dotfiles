@@ -37,3 +37,11 @@ permissions:
       - files.pythonhosted.org
       # pyright/vtsls/typescript via npm (install_lsps)
       - registry.npmjs.org
+
+agentInstructions:
+  content: |
+    Do not `git commit --amend`, `git rebase`, or take any other action that
+    would modify git commits and prevent the user from reviewing incremental
+    changes using git without explicit instructions to do so.
+
+    Do not push git branches without explicit instructions to do so.

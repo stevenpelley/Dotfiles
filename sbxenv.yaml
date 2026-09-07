@@ -20,4 +20,4 @@ schemaVersion: "1"
 kits:
   # Thin kit: clones the repo and runs install.sh all. `ref` pins the branch;
   # drop it to track the default branch at creation time.
-  - git+https://github.com/stevenpelley/Dotfiles#ref=master
+  - git+https://github.com/stevenpelley/Dotfiles#ref=main

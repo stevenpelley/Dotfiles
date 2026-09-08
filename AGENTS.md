@@ -28,6 +28,7 @@ ssh disconnects but not VM restarts).
   uses it (this used to be the `config/nvim-trial` experiment). See its
   README and the comments in `init.lua`
 - `config/zellij` — Zellij config
+- `config/ghostty` — Ghostty terminal config
 
 ## Commands and verification
 

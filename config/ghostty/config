@@ -1,0 +1,3 @@
+macos-option-as-alt = true
+keybind = option+left=unbind
+keybind = option+right=unbind

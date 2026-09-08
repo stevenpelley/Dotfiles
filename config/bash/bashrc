@@ -14,6 +14,12 @@ fi
 if [ -d ~/Library/Python/3.8/bin ]; then
   export PATH="$PATH:$HOME/Library/Python/3.8/bin"
 fi
+if [ -d ~/.docker/bin ]; then
+  export PATH="$PATH:$HOME/.docker/bin"
+fi
+if [ -d ~/.vector/bin ]; then
+  export PATH="$PATH:$HOME/.vector/bin"
+fi
 
 # use the best vi available
 if which nvim > /dev/null; then

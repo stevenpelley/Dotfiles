@@ -16,7 +16,7 @@ link_configs() {
   olddir=~/Dotfiles_old             # old dotfiles backup directory
   oldconfigdir=~/Config_old
   files="bashrc vimrc bash_profile sbxenv.yaml"    # list of files/folders to symlink in homedir
-  config_dirs="bash fish nvim nvim-trial zellij"
+  config_dirs="bash fish nvim zellij"
 
   ##########
 
@@ -86,9 +86,9 @@ install_nvim() {
     brew install neovim
     return 0
   fi
-  # Linux: apt ships nvim < 0.11 on many distros (nvim-trial requires >= 0.11),
+  # Linux: apt ships nvim < 0.11 on many distros (the config requires >= 0.11),
   # so install the pinned official release into ~/.local. Bump NVIM_VERSION
-  # together with config/nvim-trial (treesitter pin expects 0.11).
+  # together with config/nvim (treesitter pin expects 0.11).
   NVIM_VERSION=v0.11.6
   case "$(uname -m)" in
     x86_64)          nv_arch="x86_64" ;;
@@ -110,7 +110,7 @@ install_nvim() {
 }
 
 install_lsps() {
-  # nvim-trial needs pyright, vtsls (+ typescript) and ruff on PATH
+  # the nvim config needs pyright, vtsls (+ typescript) and ruff on PATH
   if ! which pyright-langserver > /dev/null; then
     if which brew > /dev/null; then
       brew install pyright

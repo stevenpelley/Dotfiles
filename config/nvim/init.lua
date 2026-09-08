@@ -1,5 +1,4 @@
--- nvim-trial: a minimal Neovim config for *reading* code with LSP features.
--- Loaded only when launched as `NVIM_APPNAME=nvim-trial nvim` (alias: nvtrial).
+-- Neovim configuration optimized for *reading* code with LSP features.
 -- Targets Neovim >= 0.11 (uses native vim.lsp.config/enable).
 
 vim.g.mapleader = " "
@@ -50,7 +49,7 @@ require("lazy").setup({
         -- current (main-branch) API
         require("nvim-treesitter").install(ts_langs)
         vim.api.nvim_create_autocmd("FileType", {
-          group = vim.api.nvim_create_augroup("nvim-trial-treesitter", { clear = true }),
+          group = vim.api.nvim_create_augroup("treesitter-highlighting", { clear = true }),
           callback = function(args)
             pcall(vim.treesitter.start, args.buf)
           end,
@@ -165,14 +164,13 @@ require("lazy").setup({
   -- :help can't open them until the plugin loads -> E661)
   { "sindrets/diffview.nvim" },
 }, {
-  -- everything lives under the nvim-trial data dir; nuke it to reset
+  -- everything lives under the nvim data dir; nuke it to reset
   install = { missing = true },
   checker = { enabled = false },
 })
 
--- LSP keymaps beyond nvim 0.11's defaults (grn/gra/grr/gri/grt/gO). Mapped
+local lsp_augroup = vim.api.nvim_create_augroup("lsp-maps", { clear = true })
 -- buffer-locally on LspAttach so non-LSP buffers keep vim's built-in gd/K.
-local lsp_augroup = vim.api.nvim_create_augroup("nvim-trial-lsp-maps", { clear = true })
 vim.api.nvim_create_autocmd("LspAttach", {
   group = lsp_augroup,
   callback = function(args)
@@ -218,9 +216,8 @@ local function lazygit_toggle()
 end
 vim.keymap.set("n", "<leader>gg", lazygit_toggle, { desc = "Toggle lazygit" })
 
--- Floating netrw explorer (toggles over any tab) -----------------------------
 vim.g.netrw_browse_split = 4 -- files opened from netrw go to the previous window
-_G.NvimTrialExploreToggle = function()
+_G.NvimExploreToggle = function()
   for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
     local cfg = vim.api.nvim_win_get_config(w)
     if cfg.relative ~= "" and vim.bo[vim.api.nvim_win_get_buf(w)].filetype == "netrw" then
@@ -241,7 +238,7 @@ _G.NvimTrialExploreToggle = function()
   })
   vim.cmd("Ex") -- netrw takes over the new float
 end
-vim.keymap.set("n", "<leader>fe", _G.NvimTrialExploreToggle, { desc = "Toggle file explorer" })
+vim.keymap.set("n", "<leader>fe", _G.NvimExploreToggle, { desc = "Toggle file explorer" })
 
 -- LSP hover border (cosmetic) ------------------------------------------------
 vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(vim.lsp.handlers.hover, { border = "rounded" })

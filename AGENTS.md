@@ -24,10 +24,9 @@ ssh disconnects but not VM restarts).
 - Docker's kit-reference and kit-examples doc pages are 404s; the working
   schema came from `docker/sbx-kits-contrib` on GitHub (`schemaVersion: "2"`,
   `kind: mixin`, ...). Validate with `sbx kit validate .` (host-side).
-- `config/bash`, `config/fish` — shell setup; `nvtrial` alias defined here
-- `config/nvim` — legacy bridge (`init.vim` sources `~/.vimrc`); do not extend it
-- `config/nvim-trial` — experimental Neovim config, isolated via
-  `NVIM_APPNAME=nvim-trial`; see its README and the comments in `init.lua`
+- `config/nvim` — Neovim config for LSP-based code reading; plain `nvim`
+  uses it (this used to be the `config/nvim-trial` experiment). See its
+  README and the comments in `init.lua`
 - `config/zellij` — Zellij config
 
 ## Commands and verification
@@ -38,7 +37,7 @@ ssh disconnects but not VM restarts).
   skipped if already on PATH)
 - Verify before committing:
   - shells: `bash -n install.sh` (syntax) and `bash -i -c 'echo ok'` (sources cleanly)
-  - nvim-trial: `NVIM_APPNAME=nvim-trial nvim --headless +qa` (config loads)
+  - nvim: `nvim --headless +qa` (config loads)
   - zellij: `zellij setup --check`
 
 ## Gotchas (all learned the hard way — see git log)
@@ -51,7 +50,7 @@ ssh disconnects but not VM restarts).
   (`ZELLIJ_SESSION_NAME` etc. are set). Unset those vars when launching zellij
   in tests, otherwise CLI invocations route into the user's live session
   (e.g. `zellij --layout X` becomes "add tab to current session").
-- `config/nvim-trial/init.lua` pins `nvim-treesitter` to `v0.10.0` because the
+- `config/nvim/init.lua` pins `nvim-treesitter` to `v0.10.0` because the
   plugin's main branch requires Neovim 0.12 while apt/brew ship 0.11. Don't
   remove the pin unless the target nvim is ≥ 0.12; the config has a fallback
   path for the modern treesitter API.
@@ -61,17 +60,17 @@ ssh disconnects but not VM restarts).
   `Alt+g` → `Write 7` (passes Ctrl+G to the focused pane so coding agents can
   open their prompt editor). It is deliberately **not** bound in `locked` mode.
 - `install.sh` installs Neovim as a pinned v0.11 release from GitHub into
-  `~/.local` (apt nvim is < 0.11 on many distros; nvim-trial requires >= 0.11).
+  `~/.local` (apt nvim is < 0.11 on many distros; the nvim config requires >= 0.11).
   Bump `NVIM_VERSION` in `install_nvim` only together with the treesitter pin
-  in `config/nvim-trial/init.lua` (the v0.10.0 legacy plugin API is only
+  in `config/nvim/init.lua` (the v0.10.0 legacy plugin API is only
   verified against 0.11).
 - nvim 0.11 sends LSP `settings` via `workspace/didChangeConfiguration` after
   initialize — mutating initialize params in `before_init` is a no-op. To
   affect server settings (e.g. pyright's `pythonPath`), mutate
   `client.config.settings` in `on_init`.
 - nvim 0.11's default LSP maps are `grn/gra/grr/gri/grt/gO/Ctrl-S` only;
-  `gd`/`gD`/`K`/`gci`/`gco` are mapped buffer-locally on `LspAttach` in the
-  trial config. which-key only lists mappings — built-in vim commands never
+  `gd`/`gD`/`K`/`gci`/`gco` are mapped buffer-locally on `LspAttach` in
+  `config/nvim`. which-key only lists mappings — built-in vim commands never
   appear in its menus.
 - Every `apt-get` invocation must include `-o DPkg::Lock::Timeout=10` so apt
   waits for the package lock instead of failing.
@@ -85,7 +84,7 @@ ssh disconnects but not VM restarts).
 ## Conventions
 
 - Commits: short imperative subjects, prefixed by the config when relevant
-  (e.g. `nvim-trial: ...`, `zellij: ...`).
+  (e.g. `nvim: ...`, `zellij: ...`).
 - Commit to `master`; push only when the user asks.
 - The user reviews diffs and tests interactively — keep changes minimal and
   verifiable, and prefer headless verification over launching UIs.

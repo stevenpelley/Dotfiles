@@ -36,10 +36,9 @@ Home files (as `~/.<name>`):
 
 | Directory | Purpose |
 |---|---|
-| `config/bash` | oh-my-bash bootstrap + interactive bashrc (PATH setup, aliases, `nvtrial` alias) |
-| `config/fish` | fish config (PATH, `nvtrial` alias) |
-| `config/nvim` | Legacy bridge: makes plain `nvim` behave like the `vimrc` setup. See [config/nvim/README.md](config/nvim/README.md) |
-| `config/nvim-trial` | Isolated Neovim config for LSP-based code reading. See [config/nvim-trial/README.md](config/nvim-trial/README.md) |
+| `config/bash` | oh-my-bash bootstrap + interactive bashrc (PATH setup, aliases) |
+| `config/fish` | fish config (PATH, aliases) |
+| `config/nvim` | Neovim config for LSP-based code reading (plain `nvim` uses this). See [config/nvim/README.md](config/nvim/README.md) |
 | `config/zellij` | Zellij config (unlock-first keybind preset + Ctrl+G passthrough for agents). See header comment in `config/zellij/config.kdl` |
 
 Adding a new configuration

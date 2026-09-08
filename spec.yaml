@@ -4,11 +4,12 @@ name: dotfiles
 displayName: Personal dotfiles (stevenpelley)
 description: >-
   Clones the Dotfiles repository to /home/agent/Dotfiles and runs its installer,
-  linking bash/vim/nvim-trial/zellij configuration into $HOME. Provides the
-  nvtrial alias, oh-my-bash, the zellij binary (unlock-first keybind preset with
-  Ctrl+G passthrough so coding agents can open their prompt editor), lefthook, and
-  pipx tools (jc, jello, jellex). Kit upgrades inside a running sandbox are simply
-  `git pull` in /home/agent/Dotfiles followed by `bash install.sh link`.
+  linking bash/vim/nvim/zellij configuration into $HOME. Provides oh-my-bash,
+  the Neovim config (LSP-based code reading), the zellij binary (unlock-first
+  keybind preset with Ctrl+G passthrough so coding agents can open their prompt
+  editor), lefthook, and pipx tools (jc, jello, jellex). Kit upgrades inside a
+  running sandbox are simply `git pull` in /home/agent/Dotfiles followed by
+  `bash install.sh link`.
 setup:
   install:
     # Install commands run as root; drop to the agent user so $HOME-resolved

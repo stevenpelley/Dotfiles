@@ -3,7 +3,7 @@
 # Dotfiles installer
 #
 #   bash install.sh link     # symlink home files and ~/.config/* into this repo
-#   bash install.sh install  # install tooling (zellij, oh-my-bash, pipx tools)
+#   bash install.sh install  # install tooling (zellij, lefthook, oh-my-bash, pipx tools)
 #   bash install.sh all      # install then link (order matters: oh-my-bash
 #                            # replaces ~/.bashrc, so linking must come after)
 #
@@ -159,6 +159,46 @@ install_zellij() {
   rm -rf "$tmpdir"
   ~/.local/bin/zellij --version
 }
+install_lefthook() {
+  if which lefthook > /dev/null; then
+    return
+  fi
+  if which brew > /dev/null; then
+    brew install lefthook
+    return
+  fi
+  # static binary from GitHub releases (not in apt; no brew on this host)
+  case "$(uname -s)" in
+    Darwin)
+      case "$(uname -m)" in
+        arm64)  lh_target="MacOS_arm64" ;;
+        x86_64) lh_target="MacOS_x86_64" ;;
+        *) echo "lefthook: unsupported arch $(uname -m), skipping"; return 1 ;;
+      esac
+      ;;
+    Linux)
+      case "$(uname -m)" in
+        x86_64)          lh_target="Linux_x86_64" ;;
+        aarch64 | arm64) lh_target="Linux_aarch64" ;;
+        *) echo "lefthook: unsupported arch $(uname -m), skipping"; return 1 ;;
+      esac
+      ;;
+    *) echo "lefthook: unsupported OS $(uname -s), skipping"; return 1 ;;
+  esac
+  version=$(curl -fsSL https://api.github.com/repos/evilmartians/lefthook/releases/latest |
+    grep -m1 '"tag_name"' | cut -d'"' -f4)
+  if [ -z "$version" ]; then
+    echo "lefthook: could not determine latest release, skipping"
+    return 1
+  fi
+  url="https://github.com/evilmartians/lefthook/releases/download/${version}/lefthook_${version#v}_${lh_target}"
+  tmpfile=$(mktemp)
+  curl -fsSL "$url" -o "$tmpfile"
+  mkdir -p ~/.local/bin
+  install -m755 "$tmpfile" ~/.local/bin/lefthook
+  rm -f "$tmpfile"
+  ~/.local/bin/lefthook version
+}
 ensure_linux_tooling() {
   # best-effort bootstrap for fresh sandboxes; every apt call waits for the
   # package lock instead of failing
@@ -186,6 +226,7 @@ install_commons() {
   install_nvim
   install_lsps
   install_zellij
+  install_lefthook
 
   # install oh-my-bash
   bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)" --unattended

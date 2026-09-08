@@ -14,7 +14,7 @@ ssh disconnects but not VM restarts).
 ## Layout
 
 - `bashrc`, `bash_profile`, `vimrc`, `sbxenv.yaml` — linked into `$HOME`
-- `install.sh` — `link` (symlinks), `install` (tooling: zellij, oh-my-bash, pipx tools), `all`
+- `install.sh` — `link` (symlinks), `install` (tooling: zellij, lefthook, oh-my-bash, pipx tools), `all`
 - `spec.yaml` — Docker Sandboxes mixin kit (thin-kit pattern): its install
   command clones this repo into `/home/agent/Dotfiles` and runs `install.sh
   all` as the `agent` user. No files are duplicated — the repo stays the

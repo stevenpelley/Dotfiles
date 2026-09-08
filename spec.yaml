@@ -6,8 +6,8 @@ description: >-
   Clones the Dotfiles repository to /home/agent/Dotfiles and runs its installer,
   linking bash/vim/nvim-trial/zellij configuration into $HOME. Provides the
   nvtrial alias, oh-my-bash, the zellij binary (unlock-first keybind preset with
-  Ctrl+G passthrough so coding agents can open their prompt editor), and pipx
-  tools (jc, jello, jellex). Kit upgrades inside a running sandbox are simply
+  Ctrl+G passthrough so coding agents can open their prompt editor), lefthook, and
+  pipx tools (jc, jello, jellex). Kit upgrades inside a running sandbox are simply
   `git pull` in /home/agent/Dotfiles followed by `bash install.sh link`.
 setup:
   install:

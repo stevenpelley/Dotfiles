@@ -14,6 +14,7 @@ vim.opt.undofile = true
 vim.opt.breakindent = true
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
+vim.opt.clipboard = "unnamedplus" -- yank/delete sync with the system clipboard
 -- colorful variant of the default scheme; keeps the terminal background
 vim.cmd.colorscheme("vim")
 

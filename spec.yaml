@@ -21,6 +21,13 @@ setup:
           git -C "$HOME/Dotfiles" pull --ff-only || echo "WARN: git pull failed; keeping existing clone"
           bash "$HOME/Dotfiles/install.sh" all
         '
+    # Compile the Ghostty terminfo so TERM=xterm-ghostty is recognized inside
+    # the sandbox (ssh/tmux/etc.). The description is captured in the repo via
+    # `infocmp -x xterm-ghostty` — the kit equivalent of the classic
+    # `infocmp -x xterm-ghostty | ssh SERVER -- tic -x -`. Kept out of the
+    # dotfiles installer on purpose: it is a sandbox-only concern.
+    - command: |
+        su -l agent -c 'tic -x "$HOME/Dotfiles/files/home/xterm-ghostty.terminfo"'
 permissions:
   network:
     allow:

@@ -59,43 +59,80 @@ require("lazy").setup({
   },
   { "nvim-treesitter/nvim-treesitter-context", opts = {} },
 
-  -- LSP (server configs; servers are system-installed: pyright, vtsls, ruff)
+  -- LSP (server configs; Python servers resolved from the project's uv venv)
   {
     "neovim/nvim-lspconfig",
     config = function()
-      -- pyright: prefer the project's own interpreter so imports resolve
-      -- against its dependencies. Order: <root>/.venv, then $VIRTUAL_ENV,
-      -- then pyright's default (its bundled/environment python).
-      -- Settings must be mutated on the client in on_init: nvim sends them
-      -- via didChangeConfiguration *after* initialize, so mutating the
-      -- initialize params in before_init has no effect.
-      vim.lsp.config("pyright", {
-        on_init = function(client)
-          local root = client.config.root_dir
-          local candidates = {
-            root and (root .. "/.venv/bin/python"),
-            vim.env.VIRTUAL_ENV and (vim.env.VIRTUAL_ENV .. "/bin/python"),
-            vim.fn.getcwd() .. "/.venv/bin/python",
-          }
-          for _, path in ipairs(candidates) do
-            if path and vim.uv.fs_stat(path) then
-              client.config.settings = client.config.settings or {}
-              client.config.settings.python = client.config.settings.python or {}
-              client.config.settings.python.pythonPath = path
-              break
+      -- Resolve an executable inside the project's uv-managed virtualenv.
+      --
+      -- The venv location is whatever uv itself would use, driven by
+      -- UV_PROJECT_ENVIRONMENT (e.g. the Docker Sandbox sets it to
+      -- ./.venv.agent); when unset, uv's default is .venv. We do NOT hard-code
+      -- a preference between venv names — we read the same source of truth uv
+      -- does. An absolute UV_PROJECT_ENVIRONMENT or an active VIRTUAL_ENV is
+      -- honored directly.
+      --
+      -- Returns the absolute path to <venv>/bin/<exe> if it exists, else nil.
+      -- Probes both the LSP root and cwd so it works whether nvim was opened at
+      -- the project root or in a subdirectory.
+      local function venv_bin(exe, root)
+        -- An already-activated venv is authoritative.
+        if vim.env.VIRTUAL_ENV then
+          local p = vim.env.VIRTUAL_ENV .. "/bin/" .. exe
+          if vim.uv.fs_stat(p) then
+            return p
+          end
+        end
+        local uv_env = vim.env.UV_PROJECT_ENVIRONMENT
+        -- Absolute UV_PROJECT_ENVIRONMENT points straight at the venv.
+        if uv_env and uv_env:sub(1, 1) == "/" then
+          local p = uv_env .. "/bin/" .. exe
+          return vim.uv.fs_stat(p) and p or nil
+        end
+        -- Otherwise it is a project-relative dir name (default ".venv"),
+        -- resolved against candidate project roots.
+        local venv_dir = uv_env or ".venv"
+        for _, base in ipairs({ root, vim.fn.getcwd() }) do
+          if base then
+            local p = base .. "/" .. venv_dir .. "/bin/" .. exe
+            if vim.uv.fs_stat(p) then
+              return p
             end
+          end
+        end
+        return nil
+      end
+
+      -- pyright: the langserver binary lives in the project venv and may not be
+      -- on PATH (e.g. under the sandbox), so launch it from there, falling back
+      -- to a PATH-installed one. Also point its interpreter at the same venv so
+      -- third-party imports resolve. Settings must be mutated on the client in
+      -- on_init: nvim sends them via didChangeConfiguration *after* initialize,
+      -- so mutating the initialize params in before_init has no effect.
+      vim.lsp.config("pyright", {
+        cmd = function(dispatchers)
+          local server = venv_bin("pyright-langserver", vim.fn.getcwd())
+            or "pyright-langserver"
+          return vim.lsp.rpc.start({ server, "--stdio" }, dispatchers)
+        end,
+        on_init = function(client)
+          local python = venv_bin("python", client.config.root_dir)
+          if python then
+            client.config.settings = client.config.settings or {}
+            client.config.settings.python = client.config.settings.python or {}
+            client.config.settings.python.pythonPath = python
           end
         end,
       })
-      -- ruff: same venv preference, implemented differently — the Rust ruff
+      -- ruff: same venv resolution, implemented differently — the Rust ruff
       -- server has no interpreter setting, so launch the project's own ruff
       -- binary when the venv has one (falls back to the global ruff). Server
       -- mode stabilized in ruff 0.5.3, so older pinned versions are ignored.
       vim.lsp.config("ruff", {
         cmd = function(dispatchers)
           local exe = "ruff"
-          local venv_ruff = vim.fn.getcwd() .. "/.venv/bin/ruff"
-          if vim.uv.fs_stat(venv_ruff) then
+          local venv_ruff = venv_bin("ruff", vim.fn.getcwd())
+          if venv_ruff then
             local v = vim.fn.system({ venv_ruff, "--version" }):match("ruff (%S+)")
             local parsed = v and vim.version.parse(v)
             if parsed and vim.version.gt(parsed, vim.version.parse("0.5.2")) then

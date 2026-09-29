@@ -1,5 +1,7 @@
 -- Neovim configuration optimized for *reading* code with LSP features.
--- Targets Neovim >= 0.11 (uses native vim.lsp.config/enable).
+-- Targets exactly the Neovim pinned in install.sh (NVIM_VERSION, 0.12.5):
+-- native vim.lsp.config/enable, and nvim-treesitter's main branch, which
+-- supports only the latest stable release.
 
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
@@ -34,28 +36,25 @@ require("lazy").setup({
   -- Syntax highlighting / structural navigation
   {
     "nvim-treesitter/nvim-treesitter",
-    -- final release of the pre-rewrite codebase; the main branch now needs
-    -- Neovim 0.12+, while apt/brew still ship 0.11
-    version = "v0.10.0",
+    -- main = the rewrite; it only supports the latest stable Neovim, so the
+    -- exact commit (lazy-lock.json) is bumped together with NVIM_VERSION in
+    -- install.sh. Building parsers needs the tree-sitter CLI, curl, tar and a
+    -- C compiler (install.sh provides the CLI).
+    branch = "main",
+    lazy = false, -- lazy-loading is unsupported
     build = ":TSUpdate",
     config = function()
       local ts_langs = { "python", "typescript", "tsx", "javascript", "lua", "vim", "vimdoc", "markdown", "bash" }
-      local legacy_ok = pcall(function()
-        require("nvim-treesitter.configs").setup({
-          ensure_installed = ts_langs,
-          highlight = { enable = true },
-        })
-      end)
-      if not legacy_ok then
-        -- current (main-branch) API
-        require("nvim-treesitter").install(ts_langs)
-        vim.api.nvim_create_autocmd("FileType", {
-          group = vim.api.nvim_create_augroup("treesitter-highlighting", { clear = true }),
-          callback = function(args)
-            pcall(vim.treesitter.start, args.buf)
-          end,
-        })
-      end
+      -- async, and a no-op for parsers that are already installed
+      require("nvim-treesitter").install(ts_langs)
+      -- highlighting is Neovim's own; the plugin only supplies parsers/queries.
+      -- pcall: filetypes without an installed parser just keep regex syntax.
+      vim.api.nvim_create_autocmd("FileType", {
+        group = vim.api.nvim_create_augroup("treesitter-highlighting", { clear = true }),
+        callback = function(args)
+          pcall(vim.treesitter.start, args.buf)
+        end,
+      })
     end,
   },
   { "nvim-treesitter/nvim-treesitter-context", opts = {} },

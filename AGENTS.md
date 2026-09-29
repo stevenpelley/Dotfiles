@@ -51,25 +51,34 @@ ssh disconnects but not VM restarts).
   (`ZELLIJ_SESSION_NAME` etc. are set). Unset those vars when launching zellij
   in tests, otherwise CLI invocations route into the user's live session
   (e.g. `zellij --layout X` becomes "add tab to current session").
-- `config/nvim/init.lua` pins `nvim-treesitter` to `v0.10.0` because the
-  plugin's main branch requires Neovim 0.12 while apt/brew ship 0.11. Don't
-  remove the pin unless the target nvim is ≥ 0.12; the config has a fallback
-  path for the modern treesitter API.
+- Neovim is pinned to one exact release (`NVIM_VERSION` in `install.sh`,
+  currently v0.12.5) and installed **identically on macOS and Linux** from the
+  official GitHub release tarball into `~/.local/opt/nvim-<version>`, with
+  `~/.local/bin/nvim` symlinked to it. brew/apt are deliberately not used:
+  brew floats to the newest release (this caused a macOS-only
+  `vim.lsp.with() is deprecated` warning while Linux was pinned to 0.11.6) and
+  apt ships ancient versions. `remove_other_nvims` uninstalls brew/apt nvim
+  automatically and prints manual instructions for anything else (snap,
+  AppImage, ...); old `~/.local/opt/nvim*` dirs are reported, not deleted.
+- `config/nvim` tracks nvim-treesitter's `main` branch (the rewrite), pinned
+  by commit in `lazy-lock.json`. It supports only the latest stable nvim, so
+  bump `NVIM_VERSION` and that commit **together** (`Lazy! update
+  nvim-treesitter`, then `checkhealth nvim-treesitter`). It needs the
+  tree-sitter CLI (`TREE_SITTER_VERSION` in `install.sh`, official release
+  binary — nvim-treesitter does not support the npm package), curl, tar and a
+  C compiler, and downloads parser sources from `codeload.github.com`.
+  Machines coming from the old `v0.10.0` pin keep stale parsers in the plugin
+  checkout (`lazy/nvim-treesitter/parser{,-info}`) — delete them.
 - `config/zellij/config.kdl` is the upstream `unlock-first` keybind preset
   (zellij v0.45.1, `default-plugins/configuration/src/presets.rs`) materialized
   verbatim. The only intentional customization is in `normal` mode:
   `Alt+g` → `Write 7` (passes Ctrl+G to the focused pane so coding agents can
   open their prompt editor). It is deliberately **not** bound in `locked` mode.
-- `install.sh` installs Neovim as a pinned v0.11 release from GitHub into
-  `~/.local` (apt nvim is < 0.11 on many distros; the nvim config requires >= 0.11).
-  Bump `NVIM_VERSION` in `install_nvim` only together with the treesitter pin
-  in `config/nvim/init.lua` (the v0.10.0 legacy plugin API is only
-  verified against 0.11).
-- nvim 0.11 sends LSP `settings` via `workspace/didChangeConfiguration` after
+- nvim (since 0.11) sends LSP `settings` via `workspace/didChangeConfiguration` after
   initialize — mutating initialize params in `before_init` is a no-op. To
   affect server settings (e.g. pyright's `pythonPath`), mutate
   `client.config.settings` in `on_init`.
-- nvim 0.11's default LSP maps are `grn/gra/grr/gri/grt/gO/Ctrl-S` only;
+- nvim 0.12's default LSP maps are `grn/gra/grr/gri/grt/grx/gO/Ctrl-S` only;
   `gd`/`gD`/`K`/`gci`/`gco` are mapped buffer-locally on `LspAttach` in
   `config/nvim`. which-key only lists mappings — built-in vim commands never
   appear in its menus.
@@ -78,7 +87,8 @@ ssh disconnects but not VM restarts).
 - Any new download host used by `install.sh` must be added to the
   `permissions.network.allow` list in `spec.yaml` (currently github.com,
   api.github.com, objects.githubusercontent.com, release-assets.githubusercontent.com,
-  raw.githubusercontent.com, pypi.org, files.pythonhosted.org) or provisioning
+  codeload.github.com, raw.githubusercontent.com, pypi.org, files.pythonhosted.org,
+  registry.npmjs.org) or provisioning
   fails on fresh sandboxes. Kit install commands run as **root** — anything
   that must land in `/home/agent` goes through `su -l agent -c '...'`.
 

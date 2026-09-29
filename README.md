@@ -16,7 +16,7 @@ bash ~/Dotfiles/install.sh all
 | Command | What it does |
 |---|---|
 | `bash install.sh link` | Backs up any existing dotfiles to `~/Dotfiles_old` and `~/Config_old`, then symlinks home files and `~/.config/*` into this repo. Safe to re-run — do it after adding files here. |
-| `bash install.sh install` | Installs tooling: [zellij](https://zellij.dev) (brew on macOS; on Linux the static musl binary from GitHub releases into `~/.local/bin`), oh-my-bash, and pipx tools (`jc`, `jello`, `jellex`). |
+| `bash install.sh install` | Installs tooling: Neovim pinned to an exact release (`NVIM_VERSION`) plus the tree-sitter CLI, installed identically on macOS and Linux from GitHub release tarballs into `~/.local` (any brew/apt nvim is uninstalled; see [config/nvim/README.md](config/nvim/README.md)), the LSP servers, [zellij](https://zellij.dev) (brew on macOS; on Linux the static musl binary from GitHub releases into `~/.local/bin`), lefthook, oh-my-bash, and pipx tools (`jc`, `jello`, `jellex`). |
 | `bash install.sh all` | `install` then `link`, in that order. |
 
 Order matters: the oh-my-bash installer replaces `~/.bashrc` with its own file,
@@ -49,7 +49,9 @@ Adding a new configuration
 
 Notes for machine-specific tooling in `install_commons`: prefer brew on macOS;
 on Linux prefer apt, falling back to GitHub release binaries installed into
-`~/.local/bin` (which `config/bash/bashrc` puts on PATH).
+`~/.local/bin` (which `config/bash/bashrc` puts on PATH). Exception: tools
+whose version must match across machines (Neovim, tree-sitter) are pinned and
+installed from GitHub releases on both platforms.
 
 Docker sandbox kit
 ------------------
@@ -74,7 +76,8 @@ sbx env run .sbxenv.yaml dotfiles.sbxenv.yaml
 your own `.sbxenv.yaml`, which supplies `agent` and `workspace`). The hosts in
 `permissions.network.allow` in `spec.yaml` must cover everything `install.sh`
 downloads at provision time (github.com, api.github.com, both GitHub asset
-hosts, raw.githubusercontent.com, pypi.org, files.pythonhosted.org); extend it
+hosts, codeload.github.com, raw.githubusercontent.com, pypi.org,
+files.pythonhosted.org, registry.npmjs.org); extend it
 when adding install steps. Kit install commands run as **root** — `spec.yaml`
 drops to the `agent` user before running the installer.
 

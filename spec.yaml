@@ -31,13 +31,16 @@ setup:
 permissions:
   network:
     allow:
-      # kit clone inside the sandbox + zellij release download
+      # kit clone inside the sandbox + zellij/nvim/tree-sitter release downloads
       # (api for the latest-release lookup; both GitHub asset hosts are
       # required — GitHub rotated release downloads to release-assets.*)
       - github.com
       - api.github.com
       - objects.githubusercontent.com
       - release-assets.githubusercontent.com
+      # nvim-treesitter parser sources (github.com/<repo>/archive/<rev>.tar.gz
+      # redirects here)
+      - codeload.github.com
       # oh-my-bash installer
       - raw.githubusercontent.com
       # pipx installs (jc, jello, jellex)

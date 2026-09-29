@@ -3,7 +3,8 @@
 # Dotfiles installer
 #
 #   bash install.sh link     # symlink home files and ~/.config/* into this repo
-#   bash install.sh install  # install tooling (zellij, lefthook, oh-my-bash, pipx tools)
+#   bash install.sh install  # install tooling (pinned nvim + tree-sitter CLI, LSPs,
+#                            # zellij, lefthook, oh-my-bash, pipx tools)
 #   bash install.sh all      # install then link (order matters: oh-my-bash
 #                            # replaces ~/.bashrc, so linking must come after)
 #
@@ -71,42 +72,127 @@ link_configs() {
   done
 }
 
-nvim_version_ok() {
-  command -v nvim > /dev/null || return 1
-  local v
-  v=$(nvim --version | sed -n '1s/^NVIM v//p' | cut -d. -f1,2)
-  [ "$(printf '%s\n0.11\n' "$v" | sort -V | tail -1)" = "$v" ]
+# Neovim is pinned to one exact release and installed the same way on macOS and
+# Linux: the official GitHub release tarball, unpacked into
+# ~/.local/opt/nvim-<version> with ~/.local/bin/nvim symlinked to it. brew and
+# apt are deliberately not used (brew floats to the newest release, apt lags
+# far behind), so every machine runs the identical build.
+# Bump NVIM_VERSION together with the nvim-treesitter commit in
+# config/nvim/lazy-lock.json — nvim-treesitter's main branch only supports the
+# latest stable nvim.
+NVIM_VERSION=v0.12.5
+# tree-sitter CLI, required by nvim-treesitter (main) to build parsers.
+# Official release binary (glibc on Linux); not npm, which nvim-treesitter
+# does not support.
+TREE_SITTER_VERSION=v0.27.0
+
+# release-asset OS name, shared by the neovim and tree-sitter release naming
+release_os() {
+  case "$(uname -s)" in
+    Darwin) echo macos ;;
+    Linux)  echo linux ;;
+    *)      return 1 ;;
+  esac
+}
+
+nvim_pinned_ok() {
+  [ -x ~/.local/bin/nvim ] &&
+    [ "$(~/.local/bin/nvim --version | sed -n '1s/^NVIM //p')" = "$NVIM_VERSION" ]
+}
+
+# Remove every Neovim that isn't the pinned ~/.local one, so there is exactly
+# one nvim on the machine. brew and apt installs are uninstalled automatically;
+# anything else (snap, AppImage, hand-built, ...) is reported with manual
+# removal instructions and makes this return non-zero.
+remove_other_nvims() {
+  local status=0 p
+  if command -v brew > /dev/null && brew list --formula neovim > /dev/null 2>&1; then
+    echo "nvim: uninstalling Homebrew neovim (replaced by pinned ${NVIM_VERSION})"
+    if ! brew uninstall --formula neovim; then
+      echo "nvim: 'brew uninstall neovim' failed; run it manually (see output above)"
+      status=1
+    fi
+  fi
+  if command -v dpkg > /dev/null && dpkg -s neovim 2> /dev/null | grep -q '^Status: install ok installed'; then
+    local sudo=""
+    [ "$(id -u)" = "0" ] || sudo="sudo"
+    if [ -z "$sudo" ] || sudo -n true 2> /dev/null; then
+      echo "nvim: removing apt neovim (replaced by pinned ${NVIM_VERSION})"
+      $sudo apt-get remove -y -o DPkg::Lock::Timeout=10 neovim || status=1
+    else
+      echo "nvim: apt neovim is installed; remove it with: sudo apt-get remove neovim"
+      status=1
+    fi
+  fi
+  hash -r
+  while read -r p; do
+    [ -n "$p" ] || continue
+    [ "$p" = "$HOME/.local/bin/nvim" ] && continue
+    echo "nvim: found an unmanaged nvim at $p (-> $(realpath "$p" 2> /dev/null || echo "$p"))"
+    echo "      remove it manually (e.g. 'snap remove nvim', or delete the file/AppImage),"
+    echo "      then re-run 'bash install.sh install'"
+    status=1
+  done < <(type -ap nvim)
+  return $status
 }
 
 install_nvim() {
-  if nvim_version_ok; then
+  local status=0
+  remove_other_nvims || status=1
+  if ! nvim_pinned_ok; then
+    local os arch dest
+    os=$(release_os) || { echo "nvim: unsupported OS $(uname -s), skipping"; return 1; }
+    case "$(uname -m)" in
+      x86_64)          arch="x86_64" ;;
+      aarch64 | arm64) arch="arm64" ;;
+      *)
+        echo "nvim: unsupported arch $(uname -m), skipping"
+        return 1
+        ;;
+    esac
+    dest=~/.local/opt/nvim-${NVIM_VERSION}
+    mkdir -p "$dest" ~/.local/bin
+    if ! curl -fsSL "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-${os}-${arch}.tar.gz" |
+      tar xz -C "$dest" --strip-components=1; then
+      echo "nvim: download/extract of ${NVIM_VERSION} failed"
+      return 1
+    fi
+    ln -sfn "$dest/bin/nvim" ~/.local/bin/nvim
+  fi
+  ~/.local/bin/nvim --version | head -1
+  # previous ~/.local installs are left in place (not deleted automatically)
+  local old
+  for old in ~/.local/opt/nvim ~/.local/opt/nvim-v*; do
+    [ -d "$old" ] && [ "$old" != ~/.local/opt/nvim-${NVIM_VERSION} ] &&
+      echo "nvim: old install $old is unused; remove it with: rm -r '$old'"
+  done
+  return $status
+}
+
+install_tree_sitter() {
+  if [ -x ~/.local/bin/tree-sitter ] &&
+    [ "$(~/.local/bin/tree-sitter --version | awk '{print $2}')" = "${TREE_SITTER_VERSION#v}" ]; then
     return 0
   fi
-  if which brew > /dev/null; then
-    brew install neovim
-    return 0
-  fi
-  # Linux: apt ships nvim < 0.11 on many distros (the config requires >= 0.11),
-  # so install the pinned official release into ~/.local. Bump NVIM_VERSION
-  # together with config/nvim (treesitter pin expects 0.11).
-  NVIM_VERSION=v0.11.6
+  local os arch
+  os=$(release_os) || { echo "tree-sitter: unsupported OS $(uname -s), skipping"; return 1; }
   case "$(uname -m)" in
-    x86_64)          nv_arch="x86_64" ;;
-    aarch64 | arm64) nv_arch="arm64" ;;
+    x86_64)          arch="x64" ;;
+    aarch64 | arm64) arch="arm64" ;;
     *)
-      echo "nvim: unsupported arch $(uname -m), skipping"
+      echo "tree-sitter: unsupported arch $(uname -m), skipping"
       return 1
       ;;
   esac
-  url="https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-${nv_arch}.tar.gz"
-  tmpdir=$(mktemp -d)
-  curl -fsSL "$url" | tar xz -C "$tmpdir"
-  mkdir -p ~/.local/opt ~/.local/bin
-  rm -rf ~/.local/opt/nvim
-  mv "$tmpdir/nvim-linux-${nv_arch}" ~/.local/opt/nvim
-  rm -rf "$tmpdir"
-  ln -sf ~/.local/opt/nvim/bin/nvim ~/.local/bin/nvim
-  ~/.local/bin/nvim --version | head -1
+  mkdir -p ~/.local/bin
+  if ! curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_VERSION}/tree-sitter-${os}-${arch}.gz" |
+    gunzip > ~/.local/bin/tree-sitter.partial; then
+    echo "tree-sitter: download of ${TREE_SITTER_VERSION} failed"
+    return 1
+  fi
+  chmod 755 ~/.local/bin/tree-sitter.partial
+  mv ~/.local/bin/tree-sitter.partial ~/.local/bin/tree-sitter
+  ~/.local/bin/tree-sitter --version
 }
 
 install_lsps() {
@@ -224,6 +310,7 @@ ensure_linux_tooling() {
 install_commons() {
   ensure_linux_tooling
   install_nvim
+  install_tree_sitter
   install_lsps
   install_zellij
   install_lefthook

@@ -6,20 +6,49 @@ hierarchy, diffs) without the IDE. Plain `nvim` uses this config.
 
 ## Requirements
 
-- Neovim **>= 0.11** (uses native `vim.lsp.config`/`vim.lsp.enable`).
-  `install.sh` installs a pinned nvim 0.11 release into `~/.local` on Linux
-  (apt ships < 0.11 on many distros); brew on macOS.
+- Neovim **0.12.5**, exactly. `install.sh` pins it (`NVIM_VERSION`) and installs
+  the official GitHub release tarball the same way on macOS and Linux —
+  `~/.local/opt/nvim-<version>`, symlinked as `~/.local/bin/nvim`. brew/apt
+  are not used (brew floats to the newest release, apt lags far behind), and
+  any brew/apt nvim is uninstalled so only the pinned one remains.
+- `tree-sitter` CLI (pinned `TREE_SITTER_VERSION`, installed by `install.sh`
+  into `~/.local/bin`), `curl`, `tar` and a C compiler — nvim-treesitter's
+  main branch uses them to build parsers on first run.
 - `pyright` + `ruff` (Python), `vtsls` (TypeScript/JS) on PATH — installed
   automatically by `install.sh` (npm / pipx / brew).
-- `git` and a C compiler (treesitter compiles parsers on first run)
+- `git` (lazy.nvim clones plugins)
 - `lazygit` (optional, for `<leader>gg`)
+
+## Upgrading Neovim
+
+nvim-treesitter's main branch only supports the latest stable Neovim, so bump
+both together:
+
+1. Set `NVIM_VERSION` in `install.sh`, run `bash install.sh install`.
+2. `nvim --headless "+Lazy! update nvim-treesitter" +qa` (updates
+   `lazy-lock.json`; the `:TSUpdate` build hook rebuilds parsers).
+3. Verify: `nvim --headless "+checkhealth nvim-treesitter" +qa` shows no
+   errors; commit `install.sh` + `lazy-lock.json` together.
+
+The installer leaves the previous `~/.local/opt/nvim-*` directory in place and
+prints the `rm -r` command to delete it.
+
+Moving an existing machine off the old pinned `v0.10.0` nvim-treesitter (the
+pre-rewrite `master` codebase) leaves its compiled parsers in the plugin
+checkout; delete them so only the main-branch parsers in
+`~/.local/share/nvim/site/parser` are on the runtimepath:
+
+```bash
+rm -r ~/.local/share/nvim/lazy/nvim-treesitter/parser ~/.local/share/nvim/lazy/nvim-treesitter/parser-info
+```
 
 ## Data paths
 
 | Path | Contents |
 |---|---|
 | `~/.config/nvim` | this config (symlinked from `~/Dotfiles/config/nvim`) |
-| `~/.local/share/nvim` | plugins (lazy.nvim), treesitter parsers |
+| `~/.local/share/nvim` | plugins (`lazy/`), treesitter parsers + queries (`site/`) |
+| `~/.local/opt/nvim-<version>` | the pinned Neovim itself (`~/.local/bin/nvim` links here) |
 | `~/.local/state/nvim` | shada, undo, logs |
 
 Full reset (config survives, it lives in Dotfiles):
@@ -48,7 +77,7 @@ rm -rf ~/.local/share/nvim ~/.local/state/nvim ~/.cache/nvim
 | Plugin | Role |
 |---|---|
 | lazy.nvim | plugin manager; plugins declared in `init.lua`, pinned by `lazy-lock.json` |
-| nvim-treesitter (pinned v0.10.0) | syntax highlighting + structural navigation. Main branch needs nvim 0.12+ — do not unpin on 0.11 |
+| nvim-treesitter (`main` branch, commit pinned in `lazy-lock.json`) | installs parsers/queries; highlighting itself is Neovim's (`vim.treesitter.start` on `FileType`). Supports only the latest stable nvim — bump with `NVIM_VERSION` |
 | nvim-lspconfig | server configs; enables `pyright`, `ruff`, `vtsls` |
 | blink.cmp | completion (pure-Lua fuzzy, no native build) |
 | telescope.nvim | pickers: files, grep, symbols, references, calls, help, keymaps, commands |
@@ -76,7 +105,7 @@ rm -rf ~/.local/share/nvim ~/.local/state/nvim ~/.cache/nvim
 | `]h` / `[h` | next / previous hunk |
 | `gd` / `gD` / `K` | definition / declaration / hover (buffer-local, on LSP attach) |
 | `gci` / `gco` | incoming / outgoing calls (buffer-local, on LSP attach) |
-| `grr` `gri` `grt` `grn` `gra` `gO` `Ctrl-S` | nvim 0.11 built-in LSP defaults (references, implementation, type definition, rename, code action, document symbols, signature help) |
+| `grr` `gri` `grt` `grn` `gra` `grx` `gO` `Ctrl-S` | nvim built-in LSP defaults (references, implementation, type definition, rename, code action, run codelens, document symbols, signature help) |
 
 Workflows worth knowing: run the agent (omp/kiro) in a tmux/zellij pane beside
 nvim, then review its changes with `:DiffviewOpen` (or `<leader>gg` in

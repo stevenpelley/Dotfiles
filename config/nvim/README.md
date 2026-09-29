@@ -83,6 +83,7 @@ rm -rf ~/.local/share/nvim ~/.local/state/nvim ~/.cache/nvim
 | telescope.nvim | pickers: files, grep, symbols, references, calls, help, keymaps, commands |
 | gitsigns.nvim | gutter marks + hunk staging |
 | diffview.nvim | commit/history/change-set diff review (`:DiffviewOpen`, `:DiffviewFileHistory`) |
+| neo-tree.nvim (`v3.x`) | file-explorer sidebar with git status + diagnostics; follows the current file, watches the filesystem, and replaces netrw for directories (`nvim .`). Deps: nui.nvim, nvim-web-devicons (icons need a Nerd Font — Ghostty's default font includes the glyphs) |
 | treesitter-context | sticky function/class header |
 | which-key.nvim | press `<leader>` (or `g`, `[`, `]`, `<C-w>`) and wait — popup of available bindings |
 
@@ -98,7 +99,7 @@ rm -rf ~/.local/share/nvim ~/.local/state/nvim ~/.cache/nvim
 | `<leader>fc` / `fC` | incoming / outgoing calls (call hierarchy) |
 | `<leader>fd` | diagnostics |
 | `<leader>fh` / `fk` / `ft` | search help / keymaps / all commands ("tools") |
-| `<leader>fe` | floating file explorer (netrw) |
+| `<leader>fe` | toggle file-explorer sidebar (neo-tree), revealing the current file; `?` inside it lists its keys |
 | `<leader>gg` | floating lazygit |
 | `<leader>hp` / `hb` | preview hunk / blame line |
 | `<leader>hs` / `hr` / `hd` / `hD` | stage / reset hunk, diff file vs index / vs `HEAD~` |
@@ -119,6 +120,9 @@ under `:h <plugin>`.
 - `diffview.nvim` is eager-loaded so its `:help` tags resolve (telescope lists
   docs from lazy-loaded plugins, but `:help` can't open them until load).
 - Absolute line numbers (no `relativenumber`).
+- File explorer is a neo-tree **sidebar**, not a float (preference). netrw
+  stays installed but is hijacked for directory buffers; `:Ex` still works as
+  a fallback during the neo-tree trial.
 - LSP `gd/gD/K` are mapped on `LspAttach`, so buffers without a language
   server keep vim's built-in `gd`/`K` behavior.
 

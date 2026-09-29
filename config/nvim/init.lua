@@ -200,6 +200,33 @@ require("lazy").setup({
   -- its tags (telescope help_tags lists docs from unloaded plugins, but
   -- :help can't open them until the plugin loads -> E661)
   { "sindrets/diffview.nvim" },
+  -- File explorer: left sidebar that follows the current file, with git
+  -- status and diagnostics. Replaces netrw for directory buffers (`nvim .`).
+  {
+    "nvim-neo-tree/neo-tree.nvim",
+    branch = "v3.x",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "MunifTanjim/nui.nvim",
+      "nvim-tree/nvim-web-devicons", -- icons; needs a Nerd Font (Ghostty bundles one)
+    },
+    lazy = false, -- neo-tree lazy-loads itself; eager so it can hijack netrw
+    keys = {
+      { "<leader>fe", "<Cmd>Neotree toggle reveal left<CR>", desc = "Toggle file explorer" },
+    },
+    opts = {
+      enable_git_status = true,
+      enable_diagnostics = true,
+      filesystem = {
+        -- `nvim <dir>` / `:e <dir>` open the sidebar instead of netrw
+        hijack_netrw_behavior = "open_default",
+        -- keep the tree's cursor on the file being edited
+        follow_current_file = { enabled = true },
+        -- pick up files created/deleted outside nvim (e.g. by coding agents)
+        use_libuv_file_watcher = true,
+      },
+    },
+  },
 }, {
   -- everything lives under the nvim data dir; nuke it to reset
   install = { missing = true },
@@ -252,27 +279,3 @@ local function lazygit_toggle()
   vim.cmd("startinsert")
 end
 vim.keymap.set("n", "<leader>gg", lazygit_toggle, { desc = "Toggle lazygit" })
-
-vim.g.netrw_browse_split = 4 -- files opened from netrw go to the previous window
-_G.NvimExploreToggle = function()
-  for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-    local cfg = vim.api.nvim_win_get_config(w)
-    if cfg.relative ~= "" and vim.bo[vim.api.nvim_win_get_buf(w)].filetype == "netrw" then
-      vim.api.nvim_win_close(w, true)
-      return
-    end
-  end
-  local width = math.floor(vim.o.columns * 0.6)
-  local height = math.floor(vim.o.lines * 0.85)
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_open_win(buf, true, {
-    relative = "editor",
-    width = width,
-    height = height,
-    col = math.floor((vim.o.columns - width) / 2),
-    row = math.floor((vim.o.lines - height) / 2),
-    border = "rounded",
-  })
-  vim.cmd("Ex") -- netrw takes over the new float
-end
-vim.keymap.set("n", "<leader>fe", _G.NvimExploreToggle, { desc = "Toggle file explorer" })

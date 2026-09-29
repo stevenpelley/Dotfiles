@@ -96,6 +96,6 @@ ssh disconnects but not VM restarts).
 
 - Commits: short imperative subjects, prefixed by the config when relevant
   (e.g. `nvim: ...`, `zellij: ...`).
-- Commit to `master`; push only when the user asks.
+- Commit to `main`; push only when the user asks.
 - The user reviews diffs and tests interactively — keep changes minimal and
   verifiable, and prefer headless verification over launching UIs.

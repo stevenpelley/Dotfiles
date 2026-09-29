@@ -227,6 +227,26 @@ require("lazy").setup({
       },
     },
   },
+  -- Window picker: letters over each window so neo-tree's `w`
+  -- (open_with_window_picker) can target a specific split. Also usable
+  -- directly via require("window-picker").pick_window().
+  {
+    "s1n7ax/nvim-window-picker",
+    version = "2.*",
+    lazy = true, -- loaded on first require (neo-tree requires it on `w`)
+    opts = {
+      hint = "floating-big-letter", -- big ASCII-art letter floated over each window
+      filter_rules = {
+        autoselect_one = true, -- a single candidate window is used without asking
+        include_current_win = false,
+        bo = {
+          -- never offer the tree itself, popups, terminals or quickfix
+          filetype = { "neo-tree", "neo-tree-popup", "notify" },
+          buftype = { "terminal", "quickfix" },
+        },
+      },
+    },
+  },
 }, {
   -- everything lives under the nvim data dir; nuke it to reset
   install = { missing = true },

@@ -84,6 +84,7 @@ rm -rf ~/.local/share/nvim ~/.local/state/nvim ~/.cache/nvim
 | gitsigns.nvim | gutter marks + hunk staging |
 | diffview.nvim | commit/history/change-set diff review (`:DiffviewOpen`, `:DiffviewFileHistory`) |
 | neo-tree.nvim (`v3.x`) | file-explorer sidebar with git status + diagnostics; follows the current file, watches the filesystem, and replaces netrw for directories (`nvim .`). Deps: nui.nvim, nvim-web-devicons (icons need a Nerd Font — Ghostty's default font includes the glyphs) |
+| nvim-window-picker (`2.*`) | in neo-tree, `w` opens the file in a window you pick: each candidate window shows a big floating letter (`F`, `J`, `D`, ...); press it, or `Esc` to cancel. With only one candidate it is used without asking |
 | treesitter-context | sticky function/class header |
 | which-key.nvim | press `<leader>` (or `g`, `[`, `]`, `<C-w>`) and wait — popup of available bindings |
 

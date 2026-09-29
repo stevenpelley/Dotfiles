@@ -217,7 +217,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
     end
     map("gd", vim.lsp.buf.definition, "LSP: go to definition")
     map("gD", vim.lsp.buf.declaration, "LSP: go to declaration")
-    map("K", vim.lsp.buf.hover, "LSP: hover")
+    map("K", function() vim.lsp.buf.hover({ border = "rounded" }) end, "LSP: hover")
     map("gci", vim.lsp.buf.incoming_calls, "LSP: incoming calls")
     map("gco", vim.lsp.buf.outgoing_calls, "LSP: outgoing calls")
   end,
@@ -277,6 +277,3 @@ _G.NvimExploreToggle = function()
   vim.cmd("Ex") -- netrw takes over the new float
 end
 vim.keymap.set("n", "<leader>fe", _G.NvimExploreToggle, { desc = "Toggle file explorer" })
-
--- LSP hover border (cosmetic) ------------------------------------------------
-vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(vim.lsp.handlers.hover, { border = "rounded" })

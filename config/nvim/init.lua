@@ -253,6 +253,11 @@ require("lazy").setup({
   checker = { enabled = false },
 })
 
+-- Review comments for coding agents (<leader>r…, :Review*); recorded in
+-- diffview or plain buffers and consumed by the address-review agent skill.
+-- See lua/agent_review.lua.
+require("agent_review").setup()
+
 local lsp_augroup = vim.api.nvim_create_augroup("lsp-maps", { clear = true })
 -- buffer-locally on LspAttach so non-LSP buffers keep vim's built-in gd/K.
 vim.api.nvim_create_autocmd("LspAttach", {

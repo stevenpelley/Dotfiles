@@ -101,6 +101,7 @@ rm -rf ~/.local/share/nvim ~/.local/state/nvim ~/.cache/nvim
 | `<leader>fd` | diagnostics |
 | `<leader>fh` / `fk` / `ft` | search help / keymaps / all commands ("tools") |
 | `<leader>fe` | toggle file-explorer sidebar (neo-tree), revealing the current file; `?` inside it lists its keys |
+| `<leader>fR` | list the review-comment keymaps (see [below](#review-comments-for-coding-agents)) |
 | `<leader>gg` | floating lazygit |
 | `<leader>hp` / `hb` | preview hunk / blame line |
 | `<leader>hs` / `hr` / `hd` / `hD` | stage / reset hunk, diff file vs index / vs `HEAD~` |
@@ -108,6 +109,35 @@ rm -rf ~/.local/share/nvim ~/.local/state/nvim ~/.cache/nvim
 | `gd` / `gD` / `K` | definition / declaration / hover (buffer-local, on LSP attach) |
 | `gci` / `gco` | incoming / outgoing calls (buffer-local, on LSP attach) |
 | `grr` `gri` `grt` `grn` `gra` `grx` `gO` `Ctrl-S` | nvim built-in LSP defaults (references, implementation, type definition, rename, code action, run codelens, document symbols, signature help) |
+
+## Review comments for coding agents
+
+`lua/agent_review.lua` (not a plugin; loaded from `init.lua`) records
+line-anchored review comments while you read a diff in diffview (either side,
+any revision: `:DiffviewOpen main..HEAD`, `:DiffviewFileHistory`, working
+tree) or a plain file buffer. Each comment stores the full commit SHA being
+viewed, side, path, line range, the code itself, the enclosing
+function/class (treesitter) and the commits that introduced those lines (git
+blame), so a whole PR stack can be reviewed in one diff. Then tell the agent
+"I've reviewed, address the comments" — the `address-review` skill
+(`~/Dotfiles/agents/skills`) reads them, adds a fix commit to the PR branch
+each comment belongs to (unless the comment says otherwise), restacks the
+branches above it, and replies to each comment.
+
+| Keys / command | Action |
+|---|---|
+| `<leader>rc` (normal / visual) · `:ReviewComment` | comment on line / selection; float editor, `<C-s>` saves |
+| `<leader>rs` · `:ReviewShow` | show the thread (incl. agent replies) |
+| `<leader>rr` · `:ReviewReply` | reply (reopens the comment) |
+| `<leader>re` / `rt` / `rd` | edit / toggle resolved / delete |
+| `<leader>rl` / `rL` · `:ReviewList[!]` | quickfix list of open / all comments |
+| `<leader>fR` | discover: telescope list of all review keymaps (`<CR>` runs one); also `<leader>r` + pause for the which-key menu, `<leader>ft` → "Review" for the commands |
+
+Commented lines get a `◆` sign (`◇` once resolved) and the first line of the
+comment as virtual text; `[agent replied]` marks open comments the agent
+answered with a question. Comments live in `<git-common-dir>/agent-review/comments.jsonl`
+— never committed, shared by all worktrees. Line numbers belong to the
+reviewed revision, so signs appear when that same revision is shown again.
 
 Workflows worth knowing: run the agent (omp/kiro) in a tmux/zellij pane beside
 nvim, then review its changes with `:DiffviewOpen` (or `<leader>gg` in

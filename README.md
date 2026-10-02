@@ -15,7 +15,8 @@ bash ~/Dotfiles/install.sh all
 
 | Command | What it does |
 |---|---|
-| `bash install.sh link` | Backs up any existing dotfiles to `~/Dotfiles_old` and `~/Config_old`, then symlinks home files and `~/.config/*` into this repo. Safe to re-run — do it after adding files here. |
+| `bash install.sh link` | Backs up any existing dotfiles to `~/Dotfiles_old` and `~/Config_old`, then symlinks home files and `~/.config/*` into this repo, and links agent skills (below). Safe to re-run — do it after adding files here. |
+| `bash install.sh skills` | Only the agent-skill links. |
 | `bash install.sh install` | Installs tooling: Neovim pinned to an exact release (`NVIM_VERSION`) plus the tree-sitter CLI, installed identically on macOS and Linux from GitHub release tarballs into `~/.local` (any brew/apt nvim is uninstalled; see [config/nvim/README.md](config/nvim/README.md)), the LSP servers, [zellij](https://zellij.dev) (brew on macOS; on Linux the static musl binary from GitHub releases into `~/.local/bin`), lefthook, oh-my-bash, and pipx tools (`jc`, `jello`, `jellex`). |
 | `bash install.sh all` | `install` then `link`, in that order. |
 
@@ -39,6 +40,24 @@ Home files (as `~/.<name>`):
 | `config/bash` | oh-my-bash bootstrap + interactive bashrc (PATH setup, aliases) |
 | `config/nvim` | Neovim config for LSP-based code reading (plain `nvim` uses this). See [config/nvim/README.md](config/nvim/README.md) |
 | `config/zellij` | Zellij config (unlock-first keybind preset + Ctrl+G passthrough for agents). See header comment in `config/zellij/config.kdl` |
+
+Agent skills
+------------
+
+`agents/skills/<name>/SKILL.md` are [Agent Skills](https://agentskills.io)
+shared by every coding-agent harness. `link` symlinks each skill directory into
+the user-level skills dir of each harness it detects (CLI on PATH or config dir
+present): Kiro `~/.kiro/skills` (`$KIRO_HOME`), oh-my-pi `~/.omp/agent/skills`,
+pi `~/.pi/agent/skills`, Claude Code `~/.claude/skills`, Codex
+`~/.agents/skills`, OpenCode `~/.config/opencode/skills`. Only per-skill links
+are managed; other installed skills are untouched, a pre-existing directory of
+the same name is moved to `~/Dotfiles_old/skills-<harness>/`. Install a new
+harness, then re-run `bash install.sh skills`. Agents pick up new skills in new
+sessions.
+
+| Skill | Purpose |
+|---|---|
+| `address-review` | Address review comments recorded in Neovim/diffview (see [config/nvim/README.md](config/nvim/README.md#review-comments-for-coding-agents)) |
 
 Adding a new configuration
 --------------------------

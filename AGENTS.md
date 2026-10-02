@@ -27,6 +27,12 @@ ssh disconnects but not VM restarts).
 - `config/nvim` — Neovim config for LSP-based code reading; plain `nvim`
   uses it (this used to be the `config/nvim-trial` experiment). See its
   README and the comments in `init.lua`
+- `config/nvim/lua/agent_review.lua` — review comments recorded in
+  diffview, stored in `<git-common-dir>/agent-review/comments.jsonl`; its
+  schema is shared with `agents/skills/address-review/scripts/review.py`
+  — change both together
+- `agents/skills/<name>/` — Agent Skills, symlinked per skill by
+  `install.sh link`/`skills` into each detected harness (`agent_skill_targets`)
 - `config/zellij` — Zellij config
 - `config/ghostty` — Ghostty terminal config
 
@@ -39,6 +45,10 @@ ssh disconnects but not VM restarts).
 - Verify before committing:
   - shells: `bash -n install.sh` (syntax) and `bash -i -c 'echo ok'` (sources cleanly)
   - nvim: `nvim --headless +qa` (config loads)
+  - agent_review: script a temp repo + `DiffviewOpen` headless; wait for
+    `view.cur_layout:is_files_loaded()` and invoke the float's `<C-S>`
+    buffer-map callback to submit (diffview loads asynchronously)
+  - skill links: run `link_agent_skills` with `HOME` pointed at a temp dir
   - zellij: `zellij setup --check`
 
 ## Gotchas (all learned the hard way — see git log)

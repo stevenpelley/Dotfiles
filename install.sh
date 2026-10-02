@@ -2,7 +2,10 @@
 ########################
 # Dotfiles installer
 #
-#   bash install.sh link     # symlink home files and ~/.config/* into this repo
+#   bash install.sh link     # symlink home files and ~/.config/* into this repo,
+#                            # plus agents/skills/* into each detected agent
+#                            # harness (kiro, oh-my-pi, pi, claude, codex, opencode)
+#   bash install.sh skills   # only the agent-skill links
 #   bash install.sh install  # install tooling (pinned nvim + tree-sitter CLI, LSPs,
 #                            # zellij, lefthook, oh-my-bash, pipx tools)
 #   bash install.sh all      # install then link (order matters: oh-my-bash
@@ -70,6 +73,74 @@ link_configs() {
     echo "Creating symlink to $configdir in ~/.config directory."
     ln -s $dir/config/$configdir ~/.config/$configdir
   done
+
+  link_agent_skills
+}
+
+# Agent skills ----------------------------------------------------------------
+# Skills live in agents/skills/<name>/SKILL.md (the cross-harness Agent Skills
+# format). Each one is symlinked into the user-level skills directory of every
+# coding-agent harness detected on this machine (its CLI on PATH, or its config
+# dir already present). Only the individual skill directories are linked, so
+# skills installed by other means are left alone. Some harnesses also read
+# other harnesses' dirs (omp reads ~/.claude and ~/.agents, opencode reads
+# ~/.claude); they de-duplicate skills by name.
+
+# prints "<harness> <user skills dir>" for each detected harness
+agent_skill_targets() {
+  local kiro_home="${KIRO_HOME:-$HOME/.kiro}"
+  if command -v kiro-cli > /dev/null || [ -d "$kiro_home" ]; then
+    echo "kiro $kiro_home/skills"
+  fi
+  # oh-my-pi; named profiles (~/.omp/profiles/<name>) are not handled
+  if command -v omp > /dev/null || [ -d "$HOME/.omp" ]; then
+    echo "oh-my-pi $HOME/.omp/agent/skills"
+  fi
+  if command -v pi > /dev/null || [ -d "$HOME/.pi" ]; then
+    echo "pi $HOME/.pi/agent/skills"
+  fi
+  local claude_home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  if command -v claude > /dev/null || [ -d "$claude_home" ]; then
+    echo "claude $claude_home/skills"
+  fi
+  # Codex reads user skills from the shared ~/.agents/skills
+  if command -v codex > /dev/null || [ -d "${CODEX_HOME:-$HOME/.codex}" ]; then
+    echo "codex $HOME/.agents/skills"
+  fi
+  if command -v opencode > /dev/null || [ -d "$HOME/.config/opencode" ]; then
+    echo "opencode $HOME/.config/opencode/skills"
+  fi
+}
+
+link_agent_skills() {
+  local dir=~/Dotfiles
+  local olddir=~/Dotfiles_old
+  local harness target skill name link found=""
+  while read -r harness target; do
+    found=1
+    mkdir -p "$target"
+    # drop links to skills that were removed from this repo
+    for link in "$target"/*; do
+      if [ -L "$link" ] && [ ! -e "$link" ]; then
+        case "$(readlink "$link")" in
+          "$dir"/agents/skills/*) echo "Removing stale skill link $link"; rm "$link" ;;
+        esac
+      fi
+    done
+    for skill in "$dir"/agents/skills/*/; do
+      [ -f "$skill/SKILL.md" ] || continue
+      name=$(basename "$skill")
+      if [ -L "$target/$name" ]; then
+        rm "$target/$name"
+      elif [ -e "$target/$name" ]; then
+        mkdir -p "$olddir/skills-$harness"
+        mv "$target/$name" "$olddir/skills-$harness/"
+      fi
+      echo "Linking skill $name for $harness ($target)"
+      ln -s "$dir/agents/skills/$name" "$target/$name"
+    done
+  done < <(agent_skill_targets)
+  [ -n "$found" ] || echo "No coding-agent harnesses detected; no skills linked"
 }
 
 # Neovim is pinned to one exact release and installed the same way on macOS and
@@ -330,6 +401,9 @@ install_commons() {
 case "$1" in
   link)
     link_configs
+    ;;
+  skills)
+    link_agent_skills
     ;;
   install)
     install_commons

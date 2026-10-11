@@ -33,6 +33,9 @@ ssh disconnects but not VM restarts).
   — change both together
 - `agents/skills/<name>/` — Agent Skills, symlinked per skill by
   `install.sh link`/`skills` into each detected harness (`agent_skill_targets`)
+- `agents/claude/statusline.sh` — Claude Code status line (oh-my-bash
+  `vscode` prompt + model, context, rate limits), linked by `install.sh link`
+  as `~/.claude/statusline-command.sh` (`link_claude_statusline`); needs `jq`
 - `config/zellij` — Zellij config
 - `config/ghostty` — Ghostty terminal config
 
@@ -92,6 +95,10 @@ ssh disconnects but not VM restarts).
   `gd`/`gD`/`K`/`gci`/`gco` are mapped buffer-locally on `LspAttach` in
   `config/nvim`. which-key only lists mappings — built-in vim commands never
   appear in its menus.
+- `~/.claude/settings.json` is **not** symlinked: Claude Code rewrites it
+  (`/config`, theme, permission approvals), so a linked copy would churn and
+  leak per-machine settings. `link_claude_statusline` merges only the
+  `statusLine` key with `jq`, preserving everything else.
 - Every `apt-get` invocation must include `-o DPkg::Lock::Timeout=10` so apt
   waits for the package lock instead of failing.
 - Any new download host used by `install.sh` must be added to the

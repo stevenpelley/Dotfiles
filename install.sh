@@ -5,6 +5,7 @@
 #   bash install.sh link     # symlink home files and ~/.config/* into this repo,
 #                            # plus agents/skills/* into each detected agent
 #                            # harness (kiro, oh-my-pi, pi, claude, codex, opencode)
+#                            # and the Claude Code status line
 #   bash install.sh skills   # only the agent-skill links
 #   bash install.sh install  # install tooling (pinned nvim + tree-sitter CLI, LSPs,
 #                            # zellij, lefthook, oh-my-bash, pipx tools)
@@ -75,6 +76,50 @@ link_configs() {
   done
 
   link_agent_skills
+  link_claude_statusline
+}
+
+# Claude Code status line ------------------------------------------------------
+# agents/claude/statusline.sh is linked as ~/.claude/statusline-command.sh and
+# registered under "statusLine" in ~/.claude/settings.json. settings.json is
+# merged with jq rather than symlinked: Claude Code writes to it itself
+# (/config, theme, permissions), and those per-machine settings don't belong
+# in this repo. Only the statusLine key is touched.
+link_claude_statusline() {
+  local dir=~/Dotfiles
+  local olddir=~/Dotfiles_old
+  local claude_home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  if ! command -v claude > /dev/null && [ ! -d "$claude_home" ]; then
+    echo "Claude Code not detected; no status line linked"
+    return 0
+  fi
+  mkdir -p "$claude_home"
+
+  local script="$claude_home/statusline-command.sh"
+  if [ -L "$script" ]; then
+    rm "$script"
+  elif [ -e "$script" ]; then
+    mkdir -p "$olddir"
+    mv "$script" "$olddir/claude-statusline-command.sh"
+  fi
+  echo "Linking Claude Code status line to $script"
+  ln -s "$dir/agents/claude/statusline.sh" "$script"
+
+  if ! command -v jq > /dev/null; then
+    echo "claude statusline: jq not found; statusLine not added to settings.json"
+    return 1
+  fi
+  local settings="$claude_home/settings.json"
+  [ -s "$settings" ] || echo '{}' > "$settings"
+  if jq --arg cmd "bash $script" '.statusLine = {type: "command", command: $cmd}' \
+    "$settings" > "$settings.tmp"; then
+    # write through rather than mv, preserving a symlinked settings.json
+    cat "$settings.tmp" > "$settings" && rm "$settings.tmp"
+  else
+    rm -f "$settings.tmp"
+    echo "claude statusline: could not parse $settings; statusLine not added"
+    return 1
+  fi
 }
 
 # Agent skills ----------------------------------------------------------------
@@ -370,7 +415,7 @@ ensure_linux_tooling() {
   fi
   local missing=""
   local pkg
-  for pkg in pipx git curl build-essential; do
+  for pkg in pipx git curl jq build-essential; do
     command -v "$pkg" > /dev/null || missing="$missing $pkg"
   done
   [ -z "$missing" ] && return 0

@@ -1,5 +1,5 @@
 // Zellij config — "unlock-first (non-colliding)" keybinding preset, zellij
-// v0.45.1, plus one addition:
+// v0.45.1, plus two additions:
 //
 //   normal mode (after Ctrl+g): Alt+g sends a literal Ctrl+G (byte 7 / BEL)
 //   to the focused pane and returns to locked. Ctrl+G is zellij's own unlock
@@ -8,10 +8,17 @@
 //   $EDITOR. Deliberately NOT bound in locked mode, so real Alt+g still
 //   reaches applications.
 //
+//   normal + locked: Alt+u ascends to the host (outer) session and Alt+m
+//   descends into the guest (inner) session — right-hand keys, so Alt stays
+//   held by the left hand alongside Alt+h/j/k/l. nested_session_handling
+//   "descend" also descends automatically when focus lands on a pane that
+//   runs zellij.
+//
 // Materialized from default-plugins/configuration/src/presets.rs
 // (unlock_first_keybinds) in the zellij repo at v0.45.1.
 
 default_mode "locked"
+nested_session_handling "descend"
 keybinds clear-defaults=true {
     normal {
         // after Ctrl+g (zellij command state): Option+g sends Ctrl+G to the
@@ -204,6 +211,8 @@ keybinds clear-defaults=true {
         bind "Alt l" "Alt Right" { MoveFocusOrTab "Right"; }
         bind "Alt j" "Alt Down" { MoveFocus "Down"; }
         bind "Alt k" "Alt Up" { MoveFocus "Up"; }
+        bind "Alt u" { FocusHostSession; }
+        bind "Alt m" { FocusGuestSession; }
         bind "Alt =" "Alt +" { Resize "Increase"; }
         bind "Alt -" { Resize "Decrease"; }
         bind "Alt [" { PreviousSwapLayout; }

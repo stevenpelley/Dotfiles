@@ -84,9 +84,13 @@ ssh disconnects but not VM restarts).
   checkout (`lazy/nvim-treesitter/parser{,-info}`) — delete them.
 - `config/zellij/config.kdl` is the upstream `unlock-first` keybind preset
   (zellij v0.45.1, `default-plugins/configuration/src/presets.rs`) materialized
-  verbatim. The only intentional customization is in `normal` mode:
+  verbatim. Intentional customizations: in `normal` mode,
   `Alt+g` → `Write 7` (passes Ctrl+G to the focused pane so coding agents can
-  open their prompt editor). It is deliberately **not** bound in `locked` mode.
+  open their prompt editor), deliberately **not** bound in `locked` mode; and
+  nested-session navigation — `Alt+u`/`Alt+m` (`FocusHostSession`/
+  `FocusGuestSession`) in `normal`+`locked`, plus `nested_session_handling
+  "descend"`. Keep Alt chords on the right hand (the user holds Alt with the
+  left); `Alt+n` is taken by `NewPane`.
 - nvim (since 0.11) sends LSP `settings` via `workspace/didChangeConfiguration` after
   initialize — mutating initialize params in `before_init` is a no-op. To
   affect server settings (e.g. pyright's `pythonPath`), mutate

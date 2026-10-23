@@ -32,7 +32,16 @@ ssh disconnects but not VM restarts).
   schema is shared with `agents/skills/address-review/scripts/review.py`
   — change both together
 - `agents/skills/<name>/` — Agent Skills, symlinked per skill by
-  `install.sh link`/`skills` into each detected harness (`agent_skill_targets`)
+  `install.sh link`/`skills` into each detected harness (`agent_targets`)
+- `agents/instructions.md` — user-level agent instructions, linked by
+  `install.sh link`/`instructions` into the same harnesses
+  (`link_agent_instructions`): a file in Kiro's global steering dir and
+  Claude's `~/.claude/rules/`, otherwise the harness's single user `AGENTS.md`
+- `agents/skills/sbx-mcp-client/scripts/mcpcli` — MCP client for the sbx MCP
+  gateway (python SDK `mcp==2.3.0`, venv created on first run in
+  `~/.cache/mcpcli`); `aws-mcp` skill holds the AWS MCP / Logs Insights cost
+  rules that its `logs` subcommand enforces — keep them in sync. Keep
+  account IDs and org-specific profile names out (this repo is public)
 - `agents/claude/statusline.sh` — Claude Code status line (oh-my-bash
   `vscode` prompt + model, context, rate limits), linked by `install.sh link`
   as `~/.claude/statusline-command.sh` (`link_claude_statusline`); needs `jq`
@@ -51,7 +60,9 @@ ssh disconnects but not VM restarts).
   - agent_review: script a temp repo + `DiffviewOpen` headless; wait for
     `view.cur_layout:is_files_loaded()` and invoke the float's `<C-S>`
     buffer-map callback to submit (diffview loads asynchronously)
-  - skill links: run `link_agent_skills` with `HOME` pointed at a temp dir
+  - skill/instruction links: run `link_agent_skills` and
+    `link_agent_instructions` with `HOME` pointed at a temp dir
+  - mcpcli: `python3 -m py_compile` and `mcpcli --help` (no gateway needed)
   - zellij: `zellij setup --check`
 
 ## Gotchas (all learned the hard way — see git log)

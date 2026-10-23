@@ -1,0 +1,21 @@
+#!/bin/bash
+# Runs mcpcli.py (next to this file) in a private venv with the pinned MCP
+# python SDK, creating the venv on first use. Arguments are passed through;
+# see `mcpcli --help`.
+set -euo pipefail
+
+MCP_SDK_VERSION=2.3.0
+here=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+venv="${XDG_CACHE_HOME:-$HOME/.cache}/mcpcli/venv-mcp-$MCP_SDK_VERSION"
+
+# the marker is written only after pip succeeds, so an interrupted install is
+# redone (--clear empties the half-built venv)
+if [ ! -f "$venv/.mcpcli-ready" ]; then
+  echo "mcpcli: creating $venv (mcp==$MCP_SDK_VERSION)" >&2
+  mkdir -p "$(dirname "$venv")"
+  python3 -m venv --clear "$venv" >&2
+  "$venv/bin/python" -m pip install --quiet --disable-pip-version-check "mcp==$MCP_SDK_VERSION" >&2
+  touch "$venv/.mcpcli-ready"
+fi
+
+exec "$venv/bin/python" "$here/mcpcli.py" "$@"

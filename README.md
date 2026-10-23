@@ -15,8 +15,9 @@ bash ~/Dotfiles/install.sh all
 
 | Command | What it does |
 |---|---|
-| `bash install.sh link` | Backs up any existing dotfiles to `~/Dotfiles_old` and `~/Config_old`, then symlinks home files and `~/.config/*` into this repo, and links agent skills (below). Safe to re-run — do it after adding files here. |
+| `bash install.sh link` | Backs up any existing dotfiles to `~/Dotfiles_old` and `~/Config_old`, then symlinks home files and `~/.config/*` into this repo, and links agent skills and instructions (below). Safe to re-run — do it after adding files here. |
 | `bash install.sh skills` | Only the agent-skill links. |
+| `bash install.sh instructions` | Only the agent-instructions links. |
 | `bash install.sh install` | Installs tooling: Neovim pinned to an exact release (`NVIM_VERSION`) plus the tree-sitter CLI, installed identically on macOS and Linux from GitHub release tarballs into `~/.local` (any brew/apt nvim is uninstalled; see [config/nvim/README.md](config/nvim/README.md)), the LSP servers, [zellij](https://zellij.dev) (brew on macOS; on Linux the static musl binary from GitHub releases into `~/.local/bin`), lefthook, oh-my-bash, and pipx tools (`jc`, `jello`, `jellex`). |
 | `bash install.sh all` | `install` then `link`, in that order. |
 
@@ -58,6 +59,23 @@ sessions.
 | Skill | Purpose |
 |---|---|
 | `address-review` | Address review comments recorded in Neovim/diffview (see [config/nvim/README.md](config/nvim/README.md#review-comments-for-coding-agents)) |
+| `sbx-mcp-client` | `mcpcli`: call MCP servers on the Docker Sandboxes MCP gateway from the shell, so the agent controls how much of each response enters its context |
+| `aws-mcp` | Rules for the AWS MCP Server: avoiding `run_script` timeouts, and estimate-gated, budgeted CloudWatch Logs Insights queries |
+
+Agent instructions
+------------------
+
+`agents/instructions.md` holds user-level instructions for every harness
+(currently: inside a Docker sandbox, prefer `mcpcli` against the sbx MCP
+gateway to native or agent-attached MCP tools). `link` (or
+`bash install.sh instructions`) symlinks it into each detected harness: Kiro
+`~/.kiro/steering/dotfiles.md` and Claude Code `~/.claude/rules/dotfiles.md`
+(directories of instruction files, so the user's own files stay), and
+`AGENTS.md` for the harnesses with a single user-level file: oh-my-pi
+`~/.omp/agent/`, pi `~/.pi/agent/`, Codex `~/.codex/` (`$CODEX_HOME`), OpenCode
+`~/.config/opencode/`. A pre-existing file there is moved to
+`~/Dotfiles_old/instructions-<harness>/` — merge anything you want to keep into
+`agents/instructions.md`.
 
 Adding a new configuration
 --------------------------

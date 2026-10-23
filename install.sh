@@ -3,10 +3,12 @@
 # Dotfiles installer
 #
 #   bash install.sh link     # symlink home files and ~/.config/* into this repo,
-#                            # plus agents/skills/* into each detected agent
-#                            # harness (kiro, oh-my-pi, pi, claude, codex, opencode)
+#                            # plus agents/skills/* and agents/instructions.md
+#                            # into each detected agent harness (kiro,
+#                            # oh-my-pi, pi, claude, codex, opencode)
 #                            # and the Claude Code status line
 #   bash install.sh skills   # only the agent-skill links
+#   bash install.sh instructions  # only the agent-instructions links
 #   bash install.sh install  # install tooling (pinned nvim + tree-sitter CLI, LSPs,
 #                            # zellij, lefthook, oh-my-bash, pipx tools)
 #   bash install.sh all      # install then link (order matters: oh-my-bash
@@ -76,6 +78,7 @@ link_configs() {
   done
 
   link_agent_skills
+  link_agent_instructions
   link_claude_statusline
 }
 
@@ -122,7 +125,7 @@ link_claude_statusline() {
   fi
 }
 
-# Agent skills ----------------------------------------------------------------
+# Agent skills and instructions -----------------------------------------------
 # Skills live in agents/skills/<name>/SKILL.md (the cross-harness Agent Skills
 # format). Each one is symlinked into the user-level skills directory of every
 # coding-agent harness detected on this machine (its CLI on PATH, or its config
@@ -130,38 +133,66 @@ link_claude_statusline() {
 # skills installed by other means are left alone. Some harnesses also read
 # other harnesses' dirs (omp reads ~/.claude and ~/.agents, opencode reads
 # ~/.claude); they de-duplicate skills by name.
+#
+# agents/instructions.md holds user-level instructions, linked into the same
+# harnesses. Kiro (global steering) and Claude Code (user rules) load every
+# .md in a directory, so there it is one more file next to the user's own.
+# The others read a single user-level AGENTS.md; a pre-existing one is moved
+# to ~/Dotfiles_old/instructions-<harness>/, like the other dotfiles.
 
-# prints "<harness> <user skills dir>" for each detected harness
-agent_skill_targets() {
+# prints "<harness> <user skills dir> <user instructions file>" for each
+# detected harness
+agent_targets() {
   local kiro_home="${KIRO_HOME:-$HOME/.kiro}"
   if command -v kiro-cli > /dev/null || [ -d "$kiro_home" ]; then
-    echo "kiro $kiro_home/skills"
+    echo "kiro $kiro_home/skills $kiro_home/steering/dotfiles.md"
   fi
   # oh-my-pi; named profiles (~/.omp/profiles/<name>) are not handled
   if command -v omp > /dev/null || [ -d "$HOME/.omp" ]; then
-    echo "oh-my-pi $HOME/.omp/agent/skills"
+    echo "oh-my-pi $HOME/.omp/agent/skills $HOME/.omp/agent/AGENTS.md"
   fi
   if command -v pi > /dev/null || [ -d "$HOME/.pi" ]; then
-    echo "pi $HOME/.pi/agent/skills"
+    echo "pi $HOME/.pi/agent/skills $HOME/.pi/agent/AGENTS.md"
   fi
   local claude_home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
   if command -v claude > /dev/null || [ -d "$claude_home" ]; then
-    echo "claude $claude_home/skills"
+    echo "claude $claude_home/skills $claude_home/rules/dotfiles.md"
   fi
   # Codex reads user skills from the shared ~/.agents/skills
-  if command -v codex > /dev/null || [ -d "${CODEX_HOME:-$HOME/.codex}" ]; then
-    echo "codex $HOME/.agents/skills"
+  local codex_home="${CODEX_HOME:-$HOME/.codex}"
+  if command -v codex > /dev/null || [ -d "$codex_home" ]; then
+    echo "codex $HOME/.agents/skills $codex_home/AGENTS.md"
   fi
   if command -v opencode > /dev/null || [ -d "$HOME/.config/opencode" ]; then
-    echo "opencode $HOME/.config/opencode/skills"
+    echo "opencode $HOME/.config/opencode/skills $HOME/.config/opencode/AGENTS.md"
   fi
+}
+
+link_agent_instructions() {
+  local dir=~/Dotfiles
+  local olddir=~/Dotfiles_old
+  local harness skills target found=""
+  while read -r harness skills target; do
+    found=1
+    mkdir -p "$(dirname "$target")"
+    if [ -L "$target" ]; then
+      rm "$target"
+    elif [ -e "$target" ]; then
+      mkdir -p "$olddir/instructions-$harness"
+      echo "Moving existing $target to $olddir/instructions-$harness/"
+      mv "$target" "$olddir/instructions-$harness/"
+    fi
+    echo "Linking agent instructions for $harness ($target)"
+    ln -s "$dir/agents/instructions.md" "$target"
+  done < <(agent_targets)
+  [ -n "$found" ] || echo "No coding-agent harnesses detected; no instructions linked"
 }
 
 link_agent_skills() {
   local dir=~/Dotfiles
   local olddir=~/Dotfiles_old
-  local harness target skill name link found=""
-  while read -r harness target; do
+  local harness target instructions skill name link found=""
+  while read -r harness target instructions; do
     found=1
     mkdir -p "$target"
     # drop links to skills that were removed from this repo
@@ -184,7 +215,7 @@ link_agent_skills() {
       echo "Linking skill $name for $harness ($target)"
       ln -s "$dir/agents/skills/$name" "$target/$name"
     done
-  done < <(agent_skill_targets)
+  done < <(agent_targets)
   [ -n "$found" ] || echo "No coding-agent harnesses detected; no skills linked"
 }
 
@@ -449,6 +480,9 @@ case "$1" in
     ;;
   skills)
     link_agent_skills
+    ;;
+  instructions)
+    link_agent_instructions
     ;;
   install)
     install_commons

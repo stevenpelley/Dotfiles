@@ -15,15 +15,20 @@ ssh disconnects but not VM restarts).
 
 - `bashrc`, `bash_profile`, `vimrc`, `sbxenv.yaml` — linked into `$HOME`
 - `install.sh` — `link` (symlinks), `install` (tooling: zellij, lefthook, oh-my-bash, pipx tools), `all`
-- `spec.yaml` — Docker Sandboxes mixin kit (thin-kit pattern): its install
-  command clones this repo into `/home/agent/Dotfiles` and runs `install.sh
-  all` as the `agent` user. No files are duplicated — the repo stays the
-  single source of truth. `sbxenv.yaml` is the user-home env file for
-  Docker Sandboxes, linked as `~/.sbxenv.yaml` (the sandbox only reads
-  the dot-prefixed name — it is not picked up as `~/sbxenv.yaml`).
-- Docker's kit-reference and kit-examples doc pages are 404s; the working
-  schema came from `docker/sbx-kits-contrib` on GitHub (`schemaVersion: "2"`,
-  `kind: mixin`, ...). Validate with `sbx kit validate .` (host-side).
+- `sbx/dotfiles/dotfiles.yaml` — Docker Sandboxes **v3** mixin kit
+  (thin-kit pattern, declaration-only): its install hook clones this repo
+  into `/home/agent/Dotfiles` and runs `install.sh all` as the `agent` user.
+  No files are duplicated — the repo stays the single source of truth.
+  `sbxenv.yaml` is the user-home env file for Docker Sandboxes, linked as
+  `~/.sbxenv.yaml` (the sandbox only reads the dot-prefixed name — it is not
+  picked up as `~/sbxenv.yaml`); it references the kit as
+  `git+https://github.com/stevenpelley/Dotfiles#ref=main&dir=sbx/dotfiles`.
+- The kit follows the [v3 spec](https://github.com/docker/sandbox-kit-spec).
+  v3 kits compose only with a v3 workload (e.g. `docker.io/docker/sbx-kit-kiro`)
+  and v3 mixins — not with built-in agent shortcuts like `kiro`. Validate with
+  `docker buildx build sbx/dotfiles -f sbx/dotfiles/dotfiles.yaml --output
+  type=cacheonly` (`sbx kit validate` does not accept v3 source kits; use
+  `sbx kit inspect ./sbx/dotfiles` host-side).
 - `config/nvim` — Neovim config for LSP-based code reading; plain `nvim`
   uses it (this used to be the `config/nvim-trial` experiment). See its
   README and the comments in `init.lua`
@@ -116,12 +121,13 @@ ssh disconnects but not VM restarts).
   `statusLine` key with `jq`, preserving everything else.
 - Every `apt-get` invocation must include `-o DPkg::Lock::Timeout=10` so apt
   waits for the package lock instead of failing.
-- Any new download host used by `install.sh` must be added to the
-  `permissions.network.allow` list in `spec.yaml` (currently github.com,
+- Any new download host used by `install.sh` must be added to **both** the
+  `install.allow` and `runtime.allow` lists of the `network-policy@1`
+  capability in `sbx/dotfiles/dotfiles.yaml` (currently github.com,
   api.github.com, objects.githubusercontent.com, release-assets.githubusercontent.com,
   codeload.github.com, raw.githubusercontent.com, pypi.org, files.pythonhosted.org,
-  registry.npmjs.org) or provisioning
-  fails on fresh sandboxes. Kit install commands run as **root** — anything
+  registry.npmjs.org; plus the Ubuntu apt mirrors for install only) or provisioning
+  fails on fresh sandboxes. Kit install hooks run as **root** — anything
   that must land in `/home/agent` goes through `su -l agent -c '...'`.
 
 ## Conventions

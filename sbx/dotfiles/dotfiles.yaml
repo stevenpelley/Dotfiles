@@ -1,0 +1,119 @@
+# syntax=docker/sandbox-kit:3
+# yaml-language-server: $schema=https://raw.githubusercontent.com/docker/sandbox-kit-spec/main/schema/kit.schema.json
+#
+# Docker Sandboxes mixin for this Dotfiles repository (thin-kit pattern).
+# The install hook clones https://github.com/stevenpelley/Dotfiles into
+# /home/agent/Dotfiles and runs `install.sh all`; nothing is duplicated into
+# the kit, so the repo stays the single source of truth and upgrades inside a
+# running sandbox are `git pull` + `bash install.sh link`.
+#
+# Declaration-only: there is no companion dotfiles.dockerfile. The install
+# stays a create-time hook rather than image content because install.sh may
+# apt-get missing packages (a mixin overlay cannot carry dpkg state) and
+# writes into $HOME, which belongs to the composed workload.
+#
+# v3 kits compose only with v3 kits: use this with a v3 workload such as
+# docker.io/docker/sbx-kit-kiro, not the built-in `kiro` agent shortcut.
+#
+# Consume it from Git, selecting this directory:
+#   git+https://github.com/stevenpelley/Dotfiles#ref=main&dir=sbx/dotfiles
+schemaVersion: "3"
+kind: mixin
+displayName: Personal dotfiles (stevenpelley)
+description: >-
+  Clones the Dotfiles repository to /home/agent/Dotfiles and runs its installer,
+  linking bash/vim/nvim/zellij configuration into $HOME. Provides oh-my-bash,
+  the Neovim config (LSP-based code reading), the zellij binary (unlock-first
+  keybind preset with Ctrl+G passthrough so coding agents can open their prompt
+  editor), lefthook, and pipx tools (jc, jello, jellex). Kit upgrades inside a
+  running sandbox are simply `git pull` in /home/agent/Dotfiles followed by
+  `bash install.sh link`.
+version: "1.0.0"
+sourceUrl: https://github.com/stevenpelley/Dotfiles
+# No licenses: the repository carries no license file.
+
+capabilities:
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        # Install commands run as root; drop to the agent user so $HOME-resolved
+        # installs (oh-my-bash, pipx, symlinks) land in /home/agent.
+        #
+        # Hook environments are deny-by-default in v3; the downloads (git,
+        # curl, pipx, npm, apt) go through the sandbox's forced proxy, so the
+        # proxy variables are declared.
+        - command: |
+            su -l agent -c '
+              set -e
+              test -d "$HOME/Dotfiles/.git" || git clone https://github.com/stevenpelley/Dotfiles "$HOME/Dotfiles"
+              git -C "$HOME/Dotfiles" pull --ff-only || echo "WARN: git pull failed; keeping existing clone"
+              bash "$HOME/Dotfiles/install.sh" all
+            '
+          user: "0"
+          env: [HTTP_PROXY, HTTPS_PROXY, NO_PROXY, http_proxy, https_proxy, no_proxy]
+          description: Clone Dotfiles and run install.sh all as the agent user
+        # Compile the Ghostty terminfo so TERM=xterm-ghostty is recognized inside
+        # the sandbox (ssh/tmux/etc.). The description is captured in the repo via
+        # `infocmp -x xterm-ghostty` — the kit equivalent of the classic
+        # `infocmp -x xterm-ghostty | ssh SERVER -- tic -x -`. Kept out of the
+        # dotfiles installer on purpose: it is a sandbox-only concern.
+        - command: |
+            su -l agent -c 'tic -x "$HOME/Dotfiles/files/home/xterm-ghostty.terminfo"'
+          user: "0"
+          description: Compile the Ghostty terminfo for the agent user
+
+  - type: com.docker.sandbox/network-policy@1
+    config:
+      # MIGRATION NOTE: v2 had one flat allow list. v3 scopes it per phase, so
+      # the same hosts are listed for `install` (the hooks above) and for
+      # `runtime` (in-sandbox `git pull`, nvim plugin/parser updates, pipx/npm
+      # upgrades). Any new download host used by install.sh goes in both.
+      install:
+        allow:
+          # kit clone inside the sandbox + zellij/nvim/tree-sitter release downloads
+          # (api for the latest-release lookup; both GitHub asset hosts are
+          # required — GitHub rotated release downloads to release-assets.*)
+          - github.com
+          - api.github.com
+          - objects.githubusercontent.com
+          - release-assets.githubusercontent.com
+          # nvim-treesitter parser sources (github.com/<repo>/archive/<rev>.tar.gz
+          # redirects here)
+          - codeload.github.com
+          # oh-my-bash installer
+          - raw.githubusercontent.com
+          # pipx installs (jc, jello, jellex)
+          - pypi.org
+          - files.pythonhosted.org
+          # pyright/vtsls/typescript via npm (install_lsps)
+          - registry.npmjs.org
+          # MIGRATION NOTE: install.sh apt-gets missing bootstrap packages
+          # (pipx, git, curl, jq, build-essential). v2 reached the Ubuntu
+          # mirrors through the runtime's default policy; v3 grants nothing
+          # unlisted, so they are explicit here (install phase only).
+          # Portless: apt mirrors may answer on 80 or 443.
+          - archive.ubuntu.com
+          - security.ubuntu.com
+          - ports.ubuntu.com
+      runtime:
+        allow:
+          - github.com
+          - api.github.com
+          - objects.githubusercontent.com
+          - release-assets.githubusercontent.com
+          - codeload.github.com
+          - raw.githubusercontent.com
+          - pypi.org
+          - files.pythonhosted.org
+          - registry.npmjs.org
+
+  # A tool mixin contributes the body only; the workload decides where the
+  # agent reads it.
+  - type: com.docker.sandbox/agent-context@2
+    config:
+      content: |
+        Do not `git commit --amend`, `git rebase`, or take any other action that
+        would modify git commits and prevent the user from reviewing incremental
+        changes using git without explicit instructions to do so.
+
+        Do not push git branches without explicit instructions to do so.

@@ -28,7 +28,7 @@ description: >-
   editor), lefthook, and pipx tools (jc, jello, jellex). Kit upgrades inside a
   running sandbox are simply `git pull` in /home/agent/Dotfiles followed by
   `bash install.sh link`.
-version: "1.0.0"
+version: "1.0.1"
 sourceUrl: https://github.com/stevenpelley/Dotfiles
 # No licenses: the repository carries no license file.
 
@@ -108,8 +108,10 @@ capabilities:
           - registry.npmjs.org
 
   # A tool mixin contributes the body only; the workload decides where the
-  # agent reads it.
-  - type: com.docker.sandbox/agent-context@2
+  # agent reads it. @1, not @2: the spec refuses to compose @1 and @2
+  # together, and docker.io/docker/sbx-kit-kiro:1.0.0 declares @1 (KIRO.md).
+  # Inline `content` is the @1 form for a kit with no layers to stage into.
+  - type: com.docker.sandbox/agent-context@1
     config:
       content: |
         Do not `git commit --amend`, `git rebase`, or take any other action that

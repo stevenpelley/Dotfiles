@@ -22,19 +22,19 @@ if [ -d ~/.vector/bin ]; then
 fi
 
 # use the best vi available
-if which nvim > /dev/null; then
+if command -v nvim > /dev/null 2>&1; then
   export EDITOR="nvim"
   alias vim='nvim'
   alias vi='nvim'
-elif which vim > /dev/null; then
+elif command -v vim > /dev/null 2>&1; then
   export EDITOR="vim"
   alias vi='vim'
-elif which vi > /dev/null; then
+elif command -v vi > /dev/null 2>&1; then
   export EDITOR="vi"
   alias vim='vi'
 fi
 
-if which pdftk > /dev/null; then
+if command -v pdftk > /dev/null 2>&1; then
   function pdftk_shuffle {
     pdftk A="$1" B="$2" shuffle A Bend-1 output "$3"
   }

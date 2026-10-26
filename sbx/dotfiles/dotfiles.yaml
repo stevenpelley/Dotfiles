@@ -43,6 +43,11 @@ capabilities:
         # curl, pipx, npm, apt) go through the sandbox's forced proxy, so the
         # proxy variables are declared.
         - command: |
+            # The workload (sbx-kit-kiro) creates the agent user with /bin/sh;
+            # make bash the login shell. usermod, not chsh: there is no
+            # /etc/shells in the image and chsh validates against it. Runs
+            # before the su below so install.sh's `bash -i` sees the right shell.
+            usermod -s /usr/bin/bash agent
             su -l agent -c '
               set -e
               test -d "$HOME/Dotfiles/.git" || git clone https://github.com/stevenpelley/Dotfiles "$HOME/Dotfiles"
@@ -51,7 +56,7 @@ capabilities:
             '
           user: "0"
           env: [HTTP_PROXY, HTTPS_PROXY, NO_PROXY, http_proxy, https_proxy, no_proxy]
-          description: Clone Dotfiles and run install.sh all as the agent user
+          description: Set agent login shell to bash, clone Dotfiles and run install.sh all
         # Compile the Ghostty terminfo so TERM=xterm-ghostty is recognized inside
         # the sandbox (ssh/tmux/etc.). The description is captured in the repo via
         # `infocmp -x xterm-ghostty` — the kit equivalent of the classic

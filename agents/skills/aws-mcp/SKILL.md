@@ -19,10 +19,14 @@ Inside a Docker sandbox, call it with the `sbx-mcp-client` skill's `mcpcli`
 
 ## 1. Access
 
-- Tools are named `aws___*`. Every call takes an `aws_profile`. Profiles are
-  named by the host's AWS MCP registration, so they differ per user and
-  project: take them from the project's docs or ask the user. Use the
-  profile for the account that owns the resource. Region is usually
+- Tools are named `aws___*`. How the host registered the server decides
+  whether calls take an `aws_profile`: a multi-profile registration requires
+  it on every call; one started with `--profile P` (confirmed 2026-10-28)
+  has no such argument, rejects it, and always signs as `P`. Check the
+  schema with `mcpcli describe aws___run_script`. Profiles are named by the
+  host's registration, so they differ per user and project: take them from
+  the project's docs or ask the user. Use the profile for the account that
+  owns the resource. Region is usually
   `us-east-1`.
 - Never run the AWS CLI or SDK from bash. If a CLI comparison would help,
   give the user the command and let them run it with their own credentials.
@@ -117,7 +121,7 @@ returns `query_id` if the query is still running after `--max-wait`. Read
 the rows (`jq '.rows[:20]'`) only after checking their count.
 
 **Natively**, one `aws___run_script` call per step, with the `aws_profile` for
-the account that owns the log group:
+the account that owns the log group (if the schema takes one):
 
 1. **Estimate.** Fix the time range once and reuse it in step 3 so the
    estimate matches the query:

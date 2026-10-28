@@ -43,8 +43,11 @@ $M spend --session <id>                   # Logs Insights spend from the session
 - Exit codes: 0 success, 1 failure (message on stderr), 2 usage error or a
   `logs` query that is not `Complete` (refused by a budget, still running, or
   failed).
-- `py` and `logs` sign with `--profile`, defaulting to `$MCPCLI_AWS_PROFILE`;
-  one of them is required. Before `py` or `logs`, load the `aws-mcp` skill
+- `py` and `logs` sign with `--profile`, defaulting to `$MCPCLI_AWS_PROFILE`.
+  It is required only when the tools take an `aws_profile` argument; a server
+  registered with a fixed profile (`mcp-proxy-for-aws-cli ... --profile P`)
+  takes none and rejects it, so `mcpcli` checks the tool schema and drops a
+  given profile with a note on stderr. Before `py` or `logs`, load the `aws-mcp` skill
   and follow it: Logs Insights queries cost money, and `logs` enforces the
   budgets described there (`--max-gb`, `--budget-5m`, `--budget-60m`
   override them; use those only when the user says to).

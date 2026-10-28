@@ -32,7 +32,9 @@ URL = os.environ.get("MCP_GATEWAY_URL", "http://mcp-gateway.docker.internal/mcp"
 # Sentinel value; the sandbox proxy swaps it for real credentials. Not a secret.
 TOKEN = os.environ.get("MCP_SENTINEL_TOKEN_NAME", "proxy-managed")
 # Default aws_profile for `py` and `logs`; --profile overrides. No built-in default: profile names
-# come from the host's AWS MCP registration, which differs per user and project.
+# come from the host's AWS MCP registration, which differs per user and project. A server registered
+# with a fixed profile (`mcp-proxy-for-aws-cli ... --profile P`) has no aws_profile argument; then
+# none is needed and any given is ignored.
 PROFILE = os.environ.get("MCPCLI_AWS_PROFILE")
 GUARD = (Path(__file__).parent / "cwl_guarded_query.py").read_text()
 # Logs Insights spend ledger: one per agent session (--session), one JSON line per query that ran.
@@ -84,8 +86,21 @@ class Gateway:
             raise RuntimeError(f"{name} error: {text[:1000]}")
         return text
 
+    async def _with_profile(self, tool, args, profile):
+        """Add aws_profile to args if the tool's schema takes it (multi-profile registration)."""
+        if not hasattr(self, "_schemas"):
+            self._schemas = {t.name: getattr(t, "input_schema", None) or getattr(t, "inputSchema", None) or {}
+                             for t in (await self.session.list_tools()).tools}
+        if "aws_profile" not in self._schemas.get(tool, {}).get("properties", {}):
+            if profile:
+                log(f"{tool} takes no aws_profile (server registered with a fixed profile); ignoring {profile!r}")
+            return args
+        if not profile:
+            raise RuntimeError(f"{tool} needs an aws_profile: pass --profile or set $MCPCLI_AWS_PROFILE")
+        return {**args, "aws_profile": profile}
+
     async def py(self, code, profile=PROFILE, task_wait=300):
-        text = await self.call("aws___run_script", {"code": code, "aws_profile": profile})
+        text = await self.call("aws___run_script", await self._with_profile("aws___run_script", {"code": code}, profile))
         out = self._parse(text)
         # Calls longer than ~90s come back as {"status": "working", "task_id": ...}; poll get_tasks.
         poll, t = 1, time.time()
@@ -94,8 +109,8 @@ class Gateway:
                 raise RuntimeError(f"task {out['task_id']} still working after {task_wait}s")
             log(f"task {out['task_id']} working; polling get_tasks (#{poll})")
             await asyncio.sleep(5)
-            text = await self.call("aws___get_tasks", {"task_ids": [out["task_id"]], "poll_iteration": poll,
-                                                       "aws_profile": profile})
+            args = {"task_ids": [out["task_id"]], "poll_iteration": poll}
+            text = await self.call("aws___get_tasks", await self._with_profile("aws___get_tasks", args, profile))
             out = self._unwrap_task(self._parse(text), out["task_id"])
             poll += 1
         if out.get("status") != "success":
@@ -211,8 +226,9 @@ async def main():
     p = sub.add_parser("describe"); p.add_argument("tool")
     p = sub.add_parser("call"); p.add_argument("tool"); p.add_argument("args", nargs="?", default="{}")
     p = sub.add_parser("py"); p.add_argument("code", help="Python source, or @path to read it from a file")
-    profile_help = "aws_profile to sign with (default: $MCPCLI_AWS_PROFILE; required if that is unset)"
-    p.add_argument("--profile", default=PROFILE, required=PROFILE is None, help=profile_help)
+    profile_help = ("aws_profile to sign with (default: $MCPCLI_AWS_PROFILE); required when the server takes "
+                    "one, ignored when it was registered with a fixed profile")
+    p.add_argument("--profile", default=PROFILE, help=profile_help)
     p = sub.add_parser("logs"); p.add_argument("minutes", type=int); p.add_argument("query")
     p.add_argument("--group", action="append", required=True, help="log group name; repeatable")
     p.add_argument("--max-gb", type=float, default=20.0, help="per-query cap on the estimate (20 GB = $0.10)")
@@ -220,7 +236,7 @@ async def main():
     p.add_argument("--budget-60m", type=float, default=5.0, help="rolling 60-minute spend budget, USD")
     p.add_argument("--max-rows", type=int, default=1000, help="GetQueryResults maxItems (<= 10000)")
     p.add_argument("--max-wait", type=int, default=300, help="stop waiting after this; the query keeps running")
-    p.add_argument("--profile", default=PROFILE, required=PROFILE is None, help=profile_help)
+    p.add_argument("--profile", default=PROFILE, help=profile_help)
     session_help = "agent session ID; picks the spend ledger /tmp/cwl-insights-ledger-<ID>.jsonl"
     p.add_argument("--session", required=True, help=session_help)
     p = sub.add_parser("spend"); p.add_argument("--session", required=True, help=session_help)

@@ -126,7 +126,7 @@ ssh disconnects but not VM restarts).
   capability in `sbx/dotfiles/dotfiles.yaml` (currently github.com,
   api.github.com, objects.githubusercontent.com, release-assets.githubusercontent.com,
   codeload.github.com, raw.githubusercontent.com, pypi.org, files.pythonhosted.org,
-  registry.npmjs.org; plus the Ubuntu apt mirrors for install only) or provisioning
+  registry.npmjs.org, cli.github.com; plus the Ubuntu apt mirrors for install only) or provisioning
   fails on fresh sandboxes. Kit install hooks run as **root** — anything
   that must land in `/home/agent` goes through `su -l agent -c '...'`.
 

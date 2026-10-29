@@ -9,7 +9,7 @@
 #                            # and the Claude Code status line
 #   bash install.sh skills   # only the agent-skill links
 #   bash install.sh instructions  # only the agent-instructions links
-#   bash install.sh install  # install tooling (pinned nvim + tree-sitter CLI, LSPs,
+#   bash install.sh install  # install tooling (gh, pinned nvim + tree-sitter CLI, LSPs,
 #                            # zellij, lefthook, oh-my-bash, pipx tools)
 #   bash install.sh all      # install then link (order matters: oh-my-bash
 #                            # replaces ~/.bashrc, so linking must come after)
@@ -454,8 +454,61 @@ ensure_linux_tooling() {
     $SUDO apt-get install -y -o DPkg::Lock::Timeout=10 $missing
 }
 
+# GitHub CLI, kept at the latest release. Ubuntu's own gh package lags far
+# behind and breaks on GraphQL deprecations, so on apt systems gh comes from
+# GitHub's apt repo (cli.github.com/packages, per docs/install_linux.md).
+# The keyring and source list are rewritten only when their content changes,
+# so re-runs are no-ops apart from the apt update/upgrade.
+install_gh() {
+  if command -v brew > /dev/null; then
+    if brew list --formula gh > /dev/null 2>&1; then
+      brew upgrade gh
+    else
+      brew install gh
+    fi
+    return
+  fi
+  if ! command -v apt-get > /dev/null; then
+    echo "gh: no brew or apt-get; install it manually (https://github.com/cli/cli#installation)"
+    return 1
+  fi
+  local sudo=""
+  if [ "$(id -u)" != "0" ]; then
+    if ! command -v sudo > /dev/null; then
+      echo "gh: no apt privileges, skipping"
+      return 1
+    fi
+    sudo="sudo"
+  fi
+  local keyring=/etc/apt/keyrings/githubcli-archive-keyring.gpg
+  local list=/etc/apt/sources.list.d/github-cli.list
+  local tmp source
+  tmp=$(mktemp)
+  if ! curl -fsSL -o "$tmp" https://cli.github.com/packages/githubcli-archive-keyring.gpg; then
+    echo "gh: could not download the apt signing key"
+    rm -f "$tmp"
+    return 1
+  fi
+  if ! cmp -s "$tmp" "$keyring"; then
+    echo "gh: installing apt signing key $keyring"
+    $sudo install -D -m 644 "$tmp" "$keyring" || { rm -f "$tmp"; return 1; }
+  fi
+  rm -f "$tmp"
+  source="deb [arch=$(dpkg --print-architecture) signed-by=$keyring] https://cli.github.com/packages stable main"
+  if [ "$(cat "$list" 2> /dev/null)" != "$source" ]; then
+    echo "gh: writing apt source $list"
+    $sudo install -d -m 755 "$(dirname "$list")" &&
+      echo "$source" | $sudo tee "$list" > /dev/null || return 1
+  fi
+  # install upgrades gh to the repo's latest when it is already installed
+  $sudo apt-get update -o DPkg::Lock::Timeout=10 &&
+    $sudo apt-get install -y -o DPkg::Lock::Timeout=10 gh &&
+    gh --version | head -1
+}
+
 install_commons() {
   ensure_linux_tooling
+  install_gh
   install_nvim
   install_tree_sitter
   install_lsps

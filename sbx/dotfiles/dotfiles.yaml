@@ -92,6 +92,8 @@ capabilities:
           - files.pythonhosted.org
           # pyright/vtsls/typescript via npm (install_lsps)
           - registry.npmjs.org
+          # gh apt repo: signing key, package lists and .debs (install_gh)
+          - cli.github.com
           # MIGRATION NOTE: install.sh apt-gets missing bootstrap packages
           # (pipx, git, curl, jq, build-essential). v2 reached the Ubuntu
           # mirrors through the runtime's default policy; v3 grants nothing
@@ -111,6 +113,7 @@ capabilities:
           - pypi.org
           - files.pythonhosted.org
           - registry.npmjs.org
+          - cli.github.com
 
   # A tool mixin contributes the body only; the workload decides where the
   # agent reads it. @1, not @2: the spec refuses to compose @1 and @2

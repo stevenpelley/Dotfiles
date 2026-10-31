@@ -47,6 +47,15 @@ ssh disconnects but not VM restarts).
   `~/.cache/mcpcli`); `aws-mcp` skill holds the AWS MCP / Logs Insights cost
   rules that its `logs` subcommand enforces — keep them in sync. Keep
   account IDs and org-specific profile names out (this repo is public)
+- `bin/<name>` — scripts, copied by `install.sh link`/`scripts` to
+  `~/.local/share/dotfiles/bin/` and linked from `~/.local/bin/`
+  (`install_scripts`). Copied, not linked into the repo, because programs
+  run some of them with the user's credentials; re-run after editing.
+  `bin/aws-mcp-proxy` — `mcp-proxy-for-aws-cli` (uv inline-script deps,
+  pinned) that still starts when the AWS profile's SSO login has expired:
+  with `--skip-auth`, requests go unsigned until `aws sso login`. It patches
+  an internal of the proxy, so re-test before bumping the pin (verify with a
+  fake SSO profile and an expired token cache: initialize, tools/list)
 - `agents/claude/statusline.sh` — Claude Code status line (oh-my-bash
   `vscode` prompt + model, context, rate limits), linked by `install.sh link`
   as `~/.claude/statusline-command.sh` (`link_claude_statusline`); needs `jq`

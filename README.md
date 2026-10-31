@@ -18,6 +18,7 @@ bash ~/Dotfiles/install.sh all
 | `bash install.sh link` | Backs up any existing dotfiles to `~/Dotfiles_old` and `~/Config_old`, then symlinks home files and `~/.config/*` into this repo, and links agent skills and instructions (below). Safe to re-run — do it after adding files here. |
 | `bash install.sh skills` | Only the agent-skill links. |
 | `bash install.sh instructions` | Only the agent-instructions links. |
+| `bash install.sh scripts` | Only the scripts in `bin/`: each is copied to `~/.local/share/dotfiles/bin/` and linked from `~/.local/bin/` (`link` does this too). Re-run after editing one. |
 | `bash install.sh install` | Installs tooling: Neovim pinned to an exact release (`NVIM_VERSION`) plus the tree-sitter CLI, installed identically on macOS and Linux from GitHub release tarballs into `~/.local` (any brew/apt nvim is uninstalled; see [config/nvim/README.md](config/nvim/README.md)), the LSP servers, [zellij](https://zellij.dev) (brew on macOS; on Linux the static musl binary from GitHub releases into `~/.local/bin`), lefthook, oh-my-bash, and pipx tools (`jc`, `jello`, `jellex`). |
 | `bash install.sh all` | `install` then `link`, in that order. |
 
@@ -41,6 +42,13 @@ Home files (as `~/.<name>`):
 | `config/bash` | oh-my-bash bootstrap + interactive bashrc (PATH setup, aliases) |
 | `config/nvim` | Neovim config for LSP-based code reading (plain `nvim` uses this). See [config/nvim/README.md](config/nvim/README.md) |
 | `config/zellij` | Zellij config (unlock-first keybind preset + Ctrl+G passthrough for agents + Alt+u/Alt+m nested-session ascend/descend). See header comment in `config/zellij/config.kdl` |
+
+Scripts
+-------
+
+| Script | Purpose |
+|---|---|
+| `bin/aws-mcp-proxy` | [MCP Proxy for AWS](https://github.com/aws/mcp-proxy-for-aws) that starts even when the AWS profile's credentials have expired. Same arguments as `mcp-proxy-for-aws-cli`; pass `--skip-auth`. Until `aws sso login`, requests go unsigned (the server loads and lists its tools; calls needing AWS access fail), then sign again without a restart. Runs through `uv` (inline script dependencies). |
 
 Agent skills
 ------------

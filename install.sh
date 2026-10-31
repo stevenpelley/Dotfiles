@@ -9,6 +9,8 @@
 #                            # and the Claude Code status line
 #   bash install.sh skills   # only the agent-skill links
 #   bash install.sh instructions  # only the agent-instructions links
+#   bash install.sh scripts  # only bin/* (copied to ~/.local/share/dotfiles/bin,
+#                            # linked from ~/.local/bin); link also does this
 #   bash install.sh install  # install tooling (gh, pinned nvim + tree-sitter CLI, LSPs,
 #                            # zellij, lefthook, oh-my-bash, pipx tools)
 #   bash install.sh all      # install then link (order matters: oh-my-bash
@@ -80,6 +82,26 @@ link_configs() {
   link_agent_skills
   link_agent_instructions
   link_claude_statusline
+  install_scripts
+}
+
+# Scripts ----------------------------------------------------------------------
+# bin/<name> is copied to ~/.local/share/dotfiles/bin/<name> and linked as
+# ~/.local/bin/<name>. A copy, not a link into this repo: some are run by
+# other programs with the user's credentials (e.g. aws-mcp-proxy by the sbx
+# MCP gateway), so a change takes effect only when this is re-run.
+install_scripts() {
+  local dir=~/Dotfiles
+  local share=~/.local/share/dotfiles/bin
+  local script name
+  mkdir -p "$share" ~/.local/bin
+  for script in "$dir"/bin/*; do
+    [ -f "$script" ] || continue
+    name=$(basename "$script")
+    echo "Installing script $name to $share"
+    install -m755 "$script" "$share/$name"
+    ln -sfn "$share/$name" ~/.local/bin/"$name"
+  done
 }
 
 # Claude Code status line ------------------------------------------------------
@@ -536,6 +558,9 @@ case "$1" in
     ;;
   instructions)
     link_agent_instructions
+    ;;
+  scripts)
+    install_scripts
     ;;
   install)
     install_commons

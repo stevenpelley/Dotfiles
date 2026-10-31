@@ -31,15 +31,15 @@ What gets linked
 
 Home files (as `~/.<name>`):
 
-- `bashrc` — entry point; sources `~/.config/bash/oh-my-bash` and `~/.config/bash/bashrc`
-- `bash_profile` — sources `~/.bashrc` for login shells
+- `bashrc` — entry point for interactive shells; sources `~/.config/bash/oh-my-bash` and `~/.config/bash/bashrc`
+- `bash_profile` — login shells: sources `~/.config/bash/env`, then `~/.bashrc`
 - `vimrc` — the long-standing plain-vim setup
 
 `~/.config` directories (each symlinked from `config/`):
 
 | Directory | Purpose |
 |---|---|
-| `config/bash` | oh-my-bash bootstrap + interactive bashrc (PATH setup, aliases) |
+| `config/bash` | `env` (PATH and other exports, read by every login shell, interactive or not) + oh-my-bash bootstrap + interactive bashrc (aliases, prompt) |
 | `config/nvim` | Neovim config for LSP-based code reading (plain `nvim` uses this). See [config/nvim/README.md](config/nvim/README.md) |
 | `config/zellij` | Zellij config (unlock-first keybind preset + Ctrl+G passthrough for agents + Alt+u/Alt+m nested-session ascend/descend). See header comment in `config/zellij/config.kdl` |
 
@@ -77,10 +77,11 @@ Agent instructions
 (currently: inside a Docker sandbox, prefer `mcpcli` against the sbx MCP
 gateway to native or agent-attached MCP tools). `link` (or
 `bash install.sh instructions`) symlinks it into each detected harness: Kiro
-`~/.kiro/steering/dotfiles.md` and Claude Code `~/.claude/rules/dotfiles.md`
-(directories of instruction files, so the user's own files stay), and
-`AGENTS.md` for the harnesses with a single user-level file: oh-my-pi
-`~/.omp/agent/`, pi `~/.pi/agent/`, Codex `~/.codex/` (`$CODEX_HOME`), OpenCode
+`~/.kiro/steering/dotfiles.md`, Claude Code `~/.claude/rules/dotfiles.md` and
+oh-my-pi `~/.omp/agent/rules/dotfiles.md` (directories of instruction files, so
+the user's own files stay; omp loads the rule every session because of the
+file's `alwaysApply: true` frontmatter), and `AGENTS.md` for the harnesses with
+a single user-level file: pi `~/.pi/agent/`, Codex `~/.codex/` (`$CODEX_HOME`), OpenCode
 `~/.config/opencode/`. A pre-existing file there is moved to
 `~/Dotfiles_old/instructions-<harness>/` — merge anything you want to keep into
 `agents/instructions.md`.
@@ -104,9 +105,11 @@ Docker sandbox kit
 This repo is also a [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/)
 **v3 mixin kit** (`sbx/dotfiles/dotfiles.yaml`, thin-kit pattern): provisioning
 the kit clones this repository into `/home/agent/Dotfiles` and runs
-`install.sh all`. Nothing is duplicated — the kit's install hook installs from
-git, so upgrades inside an existing sandbox stay
-`git pull && bash install.sh link`.
+`install.sh all`, and a startup hook re-runs `install.sh link` on every boot
+(the create-time link runs before the agents' context dirs and CLIs exist, so
+it can miss harnesses). Nothing is duplicated — the kit's install hook installs
+from git, so upgrades inside an existing sandbox stay
+`git pull && bash install.sh link` (or `git pull` and a restart).
 
 ```bash
 # one-time host prerequisite: allowlist this kit's Git source

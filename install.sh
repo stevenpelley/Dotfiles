@@ -20,6 +20,12 @@
 # creates symlinks. Safe to re-run.
 ########################
 
+# Tools land in ~/.local/bin, and harness detection (agent_targets) looks for
+# CLIs there (omp, claude). The user's PATH setup (config/bash/env) is not
+# linked yet on a first run, and a sandbox kit hook's `su -l` shell starts
+# with the system PATH only, so put it on PATH here.
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
+
 link_configs() {
   dir=~/Dotfiles                    # dotfiles directory
   olddir=~/Dotfiles_old             # old dotfiles backup directory
@@ -169,9 +175,12 @@ agent_targets() {
   if command -v kiro-cli > /dev/null || [ -d "$kiro_home" ]; then
     echo "kiro $kiro_home/skills $kiro_home/steering/dotfiles.md"
   fi
-  # oh-my-pi; named profiles (~/.omp/profiles/<name>) are not handled
+  # oh-my-pi; named profiles (~/.omp/profiles/<name>) are not handled. A
+  # global rule (~/.omp/agent/rules/, always applied via the frontmatter in
+  # agents/instructions.md), not the single user AGENTS.md: in a Docker
+  # sandbox the runtime writes its kit guidance into that AGENTS.md.
   if command -v omp > /dev/null || [ -d "$HOME/.omp" ]; then
-    echo "oh-my-pi $HOME/.omp/agent/skills $HOME/.omp/agent/AGENTS.md"
+    echo "oh-my-pi $HOME/.omp/agent/skills $HOME/.omp/agent/rules/dotfiles.md"
   fi
   if command -v pi > /dev/null || [ -d "$HOME/.pi" ]; then
     echo "pi $HOME/.pi/agent/skills $HOME/.pi/agent/AGENTS.md"
@@ -208,6 +217,18 @@ link_agent_instructions() {
     ln -s "$dir/agents/instructions.md" "$target"
   done < <(agent_targets)
   [ -n "$found" ] || echo "No coding-agent harnesses detected; no instructions linked"
+
+  # oh-my-pi used to get ~/.omp/agent/AGENTS.md -> instructions.md; drop that
+  # link and restore the file it displaced (in a sandbox, the kit guidance)
+  local omp_old="$HOME/.omp/agent/AGENTS.md"
+  if [ -L "$omp_old" ] && case "$(readlink "$omp_old")" in */agents/instructions.md) true ;; *) false ;; esac; then
+    echo "Removing old oh-my-pi instructions link $omp_old"
+    rm "$omp_old"
+    if [ -f "$olddir/instructions-oh-my-pi/AGENTS.md" ]; then
+      echo "Restoring $omp_old from $olddir/instructions-oh-my-pi/"
+      mv "$olddir/instructions-oh-my-pi/AGENTS.md" "$omp_old"
+    fi
+  fi
 }
 
 link_agent_skills() {

@@ -1,3 +1,10 @@
+---
+# oh-my-pi reads this as a global rule (~/.omp/agent/rules/dotfiles.md) and
+# loads it every session only with alwaysApply. Claude Code and Kiro ignore
+# the key; single-AGENTS.md harnesses (pi, Codex, OpenCode) see it as text.
+alwaysApply: true
+description: User-level instructions from ~/Dotfiles
+---
 # User-level instructions
 
 <!-- Source: ~/Dotfiles/agents/instructions.md, linked into each coding-agent

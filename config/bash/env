@@ -1,0 +1,31 @@
+# Environment for every bash that reads the user's startup files, interactive
+# or not: sourced by ~/.bash_profile (login shells, including `su -l` and
+# `bash -l -c`, which is how sandbox kit hooks run) and by ~/.bashrc
+# (interactive non-login shells). Exports only — prompt, aliases, `set -o vi`
+# and oh-my-bash stay in config/bash/bashrc, behind the interactive guard.
+# Safe to source more than once: PATH entries are added only when missing.
+
+path_prepend() { case ":$PATH:" in *":$1:"*) ;; *) [ -d "$1" ] && PATH="$1:$PATH" ;; esac; }
+path_append() { case ":$PATH:" in *":$1:"*) ;; *) [ -d "$1" ] && PATH="$PATH:$1" ;; esac; }
+
+path_prepend /opt/homebrew/bin
+path_prepend "$HOME/bin"
+path_prepend "$HOME/.local/bin"
+path_append "$HOME/Library/Python/3.8/bin"
+path_append "$HOME/.docker/bin"
+path_append "$HOME/.vector/bin"
+export PATH
+unset -f path_prepend path_append
+
+# forces grep to use color even when accepting input from a pipe
+export CLICOLOR=1
+
+# used for external fish-shell devcontainer.  No better way to give an external
+# value to devcontainer.json
+if [ -d ~/fish-shell-devcontainer ]; then
+  export FISH_REPO_DIR=~/fish-shell
+fi
+
+if [ -f "$HOME/.cargo/env" ]; then
+  . "$HOME/.cargo/env"
+fi

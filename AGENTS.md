@@ -14,10 +14,16 @@ ssh disconnects but not VM restarts).
 ## Layout
 
 - `bashrc`, `bash_profile`, `vimrc`, `sbxenv.yaml` — linked into `$HOME`
+- `config/bash/env` — PATH and other exports, sourced by `bash_profile` (every
+  login shell, interactive or not: `su -l`, `bash -l -c`) and by
+  `config/bash/bashrc`; idempotent. `bashrc` keeps its interactive guard, so
+  anything a script or kit hook needs belongs in `env`, not `bashrc`
 - `install.sh` — `link` (symlinks), `install` (tooling: zellij, lefthook, oh-my-bash, pipx tools), `all`
 - `sbx/dotfiles/dotfiles.yaml` — Docker Sandboxes **v3** mixin kit
   (thin-kit pattern, declaration-only): its install hook clones this repo
-  into `/home/agent/Dotfiles` and runs `install.sh all` as the `agent` user.
+  into `/home/agent/Dotfiles` and runs `install.sh all` as the `agent` user;
+  a startup hook re-runs `install.sh link` every boot (log:
+  `~/.cache/dotfiles-link.log`).
   No files are duplicated — the repo stays the single source of truth.
   `sbxenv.yaml` is the user-home env file for Docker Sandboxes, linked as
   `~/.sbxenv.yaml` (the sandbox only reads the dot-prefixed name — it is not
@@ -41,7 +47,10 @@ ssh disconnects but not VM restarts).
 - `agents/instructions.md` — user-level agent instructions, linked by
   `install.sh link`/`instructions` into the same harnesses
   (`link_agent_instructions`): a file in Kiro's global steering dir and
-  Claude's `~/.claude/rules/`, otherwise the harness's single user `AGENTS.md`
+  Claude's `~/.claude/rules/` and omp's `~/.omp/agent/rules/` (always
+  applied via the file's frontmatter), otherwise the harness's single user
+  `AGENTS.md`. Never link omp's `~/.omp/agent/AGENTS.md`: in a Docker sandbox
+  the runtime writes the kit guidance there
 - `agents/skills/sbx-mcp-client/scripts/mcpcli` — MCP client for the sbx MCP
   gateway (python SDK `mcp==2.3.0`, venv created on first run in
   `~/.cache/mcpcli`); `aws-mcp` skill holds the AWS MCP / Logs Insights cost

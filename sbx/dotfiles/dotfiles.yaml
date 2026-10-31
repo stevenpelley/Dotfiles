@@ -28,7 +28,7 @@ description: >-
   editor), lefthook, and pipx tools (jc, jello, jellex). Kit upgrades inside a
   running sandbox are simply `git pull` in /home/agent/Dotfiles followed by
   `bash install.sh link`.
-version: "1.0.1"
+version: "1.1.0"
 sourceUrl: https://github.com/stevenpelley/Dotfiles
 # No licenses: the repository carries no license file.
 
@@ -66,6 +66,16 @@ capabilities:
             su -l agent -c 'tic -x "$HOME/Dotfiles/files/home/xterm-ghostty.terminfo"'
           user: "0"
           description: Compile the Ghostty terminfo for the agent user
+      # Every boot, re-run `link`. Install hooks run before the runtime writes
+      # the agents' context files (~/.claude, ~/.omp) and, depending on hook
+      # order, before another kit installs an agent CLI, so the create-time
+      # link can miss harnesses. link is idempotent, needs no network, and
+      # also applies a `git pull` in ~/Dotfiles at the next boot.
+      startup:
+        - command: |
+            su -l agent -c 'mkdir -p "$HOME/.cache"; bash "$HOME/Dotfiles/install.sh" link > "$HOME/.cache/dotfiles-link.log" 2>&1 || echo "dotfiles link failed; see ~/.cache/dotfiles-link.log" >&2'
+          user: "0"
+          description: Re-link dotfiles and agent skills/instructions into every detected harness
 
   - type: com.docker.sandbox/network-policy@1
     config:

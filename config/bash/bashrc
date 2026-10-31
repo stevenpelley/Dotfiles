@@ -1,25 +1,8 @@
-set -o vi
-# forces grep to use color even when accepting input from a pipe
-export CLICOLOR=1
+# Interactive shells only (the guard is in ~/.bashrc). PATH and other exports
+# live in config/bash/env, which login shells read too.
+source ~/.config/bash/env
 
-if [ -d /opt/homebrew/bin ]; then
-  export PATH="/opt/homebrew/bin:$PATH"
-fi
-if [ -d ~/bin ]; then
-  export PATH="$HOME/bin:$PATH"
-fi
-if [ -d ~/.local/bin ]; then
-  export PATH="$HOME/.local/bin:$PATH"
-fi
-if [ -d ~/Library/Python/3.8/bin ]; then
-  export PATH="$PATH:$HOME/Library/Python/3.8/bin"
-fi
-if [ -d ~/.docker/bin ]; then
-  export PATH="$PATH:$HOME/.docker/bin"
-fi
-if [ -d ~/.vector/bin ]; then
-  export PATH="$PATH:$HOME/.vector/bin"
-fi
+set -o vi
 
 # use the best vi available
 if command -v nvim > /dev/null 2>&1; then
@@ -38,16 +21,6 @@ if command -v pdftk > /dev/null 2>&1; then
   function pdftk_shuffle {
     pdftk A="$1" B="$2" shuffle A Bend-1 output "$3"
   }
-fi
-
-# used for external fish-shell devcontainer.  No better way to give an external
-# value to devcontainer.json
-if [ -d ~/fish-shell-devcontainer ]; then
-  export FISH_REPO_DIR=~/fish-shell
-fi
-
-if [ -f "$HOME/.cargo/env" ]; then
-  . "$HOME/.cargo/env"
 fi
 
 # ssh

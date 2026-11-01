@@ -49,6 +49,16 @@ def log(msg):
     print(f"[{time.time() - T0:6.1f}s {datetime.now():%H:%M:%S}] {msg}", file=sys.stderr, flush=True)
 
 
+
+class ToolError(RuntimeError):
+    """A tool result flagged as an error. The message keeps the first 1000
+    characters; `text` keeps all of it (a failed Maestro batch's per-flow
+    summary sits past that)."""
+
+    def __init__(self, name, text):
+        super().__init__(f"{name} error: {text[:1000]}")
+        self.text = text
+
 class Gateway:
     """One MCP session for the lifetime of the `async with` block."""
 
@@ -83,7 +93,7 @@ class Gateway:
         is_error = getattr(res, "is_error", getattr(res, "isError", False))
         log(f"call {name} done in {time.time() - t:.1f}s (is_error={is_error})")
         if is_error:
-            raise RuntimeError(f"{name} error: {text[:1000]}")
+            raise ToolError(name, text)
         return text
 
     async def _with_profile(self, tool, args, profile):
@@ -266,7 +276,11 @@ async def main():
             print(t.description)
             print(json.dumps(getattr(t, "input_schema", None) or getattr(t, "inputSchema", None), indent=1))
         elif a.cmd == "call":
-            print(await gw.call(a.tool, json.loads(a.args)))
+            try:
+                print(await gw.call(a.tool, json.loads(a.args)))
+            except ToolError as e:
+                print(e.text)  # the whole result, as on success; stderr gets the short form
+                raise
         elif a.cmd == "py":
             code = Path(a.code[1:]).read_text() if a.code.startswith("@") else a.code
             print(json.dumps(await gw.py(code, a.profile), indent=1, default=str))

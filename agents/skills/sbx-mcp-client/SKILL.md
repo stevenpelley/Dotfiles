@@ -40,7 +40,8 @@ $M logs <minutes> '<query>' --session <id> --group <log-group> [--group ...] [--
 $M spend --session <id>                   # Logs Insights spend from the session ledger
 ```
 
-- Exit codes: 0 success, 1 failure (message on stderr), 2 usage error or a
+- Exit codes: 0 success, 1 failure (message on stderr; when `call`'s tool
+  returns an error result, its whole text also goes to stdout), 2 usage error or a
   `logs` query that is not `Complete` (refused by a budget, still running, or
   failed).
 - `py` and `logs` sign with `--profile`, defaulting to `$MCPCLI_AWS_PROFILE`.

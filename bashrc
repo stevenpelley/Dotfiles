@@ -13,3 +13,5 @@ export NVM_DIR="$HOME/.nvm"
 if [ -f "$HOME/.okta/env-vars" ]; then
   source "$HOME/.okta/env-vars"
 fi
+# Added by Kiro CLI
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="${PATH:+$PATH:}$HOME/.local/bin" ;; esac

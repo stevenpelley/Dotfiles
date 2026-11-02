@@ -33,6 +33,7 @@ Home files (as `~/.<name>`):
 
 - `bashrc` — entry point for interactive shells; sources `~/.config/bash/oh-my-bash` and `~/.config/bash/bashrc`
 - `bash_profile` — login shells: sources `~/.config/bash/env`, then `~/.bashrc`
+- `profile` — login shells other than bash (the sbx shell kit logs in with `/bin/sh -l`): execs `bash -l` when interactive, otherwise sources `~/.config/bash/env`
 - `vimrc` — the long-standing plain-vim setup
 
 `~/.config` directories (each symlinked from `config/`):

@@ -30,7 +30,7 @@ link_configs() {
   dir=~/Dotfiles                    # dotfiles directory
   olddir=~/Dotfiles_old             # old dotfiles backup directory
   oldconfigdir=~/Config_old
-  files="bashrc vimrc bash_profile sbxenv.yaml"    # list of files/folders to symlink in homedir
+  files="bashrc vimrc bash_profile profile sbxenv.yaml"    # list of files/folders to symlink in homedir
   config_dirs="bash nvim zellij ghostty"
 
   ##########

@@ -27,3 +27,27 @@ You are in a Docker sandbox when `$MCP_GATEWAY_URL` is set. There:
 - Before calling the AWS MCP Server (`aws___*` tools), in particular for
   CloudWatch logs and Logs Insights, which cost money per query, load the
   `aws-mcp` skill and follow it.
+
+## Sub-agent cost check
+
+Sub-agents start with an empty context: they do not inherit the parent's
+conversation or prompt cache, so every sub-agent pays again for the context
+it shares with the others. Before delegating a sequence of tasks, estimate
+the shared context S each sub-agent is likely to load:
+
+- files the prompt tells it to read;
+- `AGENTS.md` and steering files it will very likely read;
+- source, test and other files it will very likely read.
+
+Estimate tokens as file bytes ÷ 4. For N sub-agents, the duplicated cost is
+(N − 1) × S.
+
+- If (N − 1) × S exceeds ~100k tokens, first use **fewer** sub-agents: group
+  tasks that share context (for example, all the steps that use one design
+  file) into one sub-agent, and recompute. Prefer fewer sub-agents to no
+  sub-agents.
+- If the cost still exceeds ~100k tokens with the fewest sensible groups, do
+  the tasks in series in the main session, compacting at ~300k tokens.
+- Files the main session has already loaded favor working in series: there
+  they are already paid for.
+- When delegating, pass the relevant sections rather than whole files.

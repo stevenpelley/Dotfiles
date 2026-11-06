@@ -1,0 +1,518 @@
+#!/usr/bin/env python3
+"""
+Control GitHub Actions CI on a stack of PR branches with `[skip ci]` marker commits.
+
+GitHub skips `push` and `pull_request` workflows when the HEAD commit of the push
+or PR contains `[skip ci]`.  A stack keeps one empty marker commit at the tip of
+each PR branch whose CI should be skipped.  Dropping the marker makes the PR's
+next push run CI; adding it back skips CI again.
+
+The stack is every local branch whose tip lies on the first-parent history
+between the base and the current branch, which must be the top of the stack.
+Enabling or disabling CI only drops or inserts empty commits, so trees never
+change and no conflicts are possible: commits above the change are recreated
+with `git commit-tree` (same tree, author and message) and all branch refs are
+updated in one transaction.  Nothing is pushed unless `push` is run.
+
+Run `stack-ci --help` for commands.  Requires git >= 2.38 for `move`.
+"""
+
+# The CLI prints to stdout and runs git from PATH by design.
+# ruff: noqa: T201, S603, S607
+
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+from dataclasses import dataclass
+
+MARKER_TAG = "[skip ci]"
+ENV_BASE = "STACK_CI_BASE"
+ENV_MOVE_SHA = "STACK_CI_MOVE_SHA"
+ENV_MOVE_BRANCH = "STACK_CI_MOVE_BRANCH"
+ENV_MOVE_CURRENT = "STACK_CI_MOVE_CURRENT"
+ENV_MOVE_MARKER = "STACK_CI_MOVE_MARKER"
+
+
+class StackError(Exception):
+    """A user-facing error; printed without a traceback."""
+
+
+def git(
+    *args: str,
+    env: dict[str, str] | None = None,
+    stdin: str | None = None,
+    strip: bool = True,
+) -> str:
+    """Run git and return stdout, raising StackError on failure."""
+    result = subprocess.run(
+        ["git", *args],
+        capture_output=True,
+        text=True,
+        env=env,
+        input=stdin,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise StackError(f"git {' '.join(args)} failed:\n{result.stderr.strip()}")
+    return result.stdout.strip() if strip else result.stdout
+
+
+def git_ok(*args: str) -> bool:
+    """Return True when git exits 0."""
+    return (
+        subprocess.run(["git", *args], capture_output=True, check=False).returncode == 0
+    )
+
+
+@dataclass
+class Commit:
+    sha: str
+    parent: str
+    tree: str
+    parent_tree: str
+    subject: str
+
+    @property
+    def is_marker(self) -> bool:
+        """An empty commit whose subject carries the skip tag."""
+        return self.tree == self.parent_tree and MARKER_TAG in self.subject
+
+
+@dataclass
+class Branch:
+    name: str
+    index: int  # index into Stack.commits of the branch tip
+
+
+@dataclass
+class Stack:
+    base_ref: str
+    base: str  # parent of the first stack commit
+    commits: list[Commit]
+    branches: list[Branch]  # bottom to top; the last is the current branch
+    current: str
+
+    def tip(self, branch: Branch) -> Commit:
+        return self.commits[branch.index]
+
+
+def resolve_base(base: str | None, remote: str) -> str:
+    """Pick the base ref: --base, then $STACK_CI_BASE, then <remote>/HEAD."""
+    if base:
+        return base
+    if os.environ.get(ENV_BASE):
+        return os.environ[ENV_BASE]
+    if git_ok("symbolic-ref", "-q", f"refs/remotes/{remote}/HEAD"):
+        return git("symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD")
+    raise StackError(f"cannot determine the base; pass --base or set ${ENV_BASE}")
+
+
+def load_stack(base_ref: str) -> Stack:
+    """Read the stack between base_ref and HEAD."""
+    current = (
+        git("symbolic-ref", "-q", "--short", "HEAD")
+        if git_ok("symbolic-ref", "-q", "HEAD")
+        else ""
+    )
+    if not current:
+        raise StackError("HEAD is detached; check out the top branch of the stack")
+    if git_ok("rev-parse", "-q", "--verify", "REBASE_HEAD") or os.path.exists(
+        git("rev-parse", "--git-path", "rebase-merge")
+    ):
+        raise StackError("a rebase is in progress; finish or abort it first")
+    if git("rev-list", "--min-parents=2", f"{base_ref}..HEAD"):
+        raise StackError(
+            f"merge commits found in {base_ref}..HEAD; the stack must be linear"
+        )
+
+    log = git("log", "--reverse", "--format=%H %P %T %s", f"{base_ref}..HEAD")
+    if not log:
+        raise StackError(f"no commits in {base_ref}..HEAD")
+    rows = [line.split(" ", 3) for line in log.splitlines()]
+    parent_trees = git(
+        "rev-parse", *[f"{row[1]}^{{tree}}" for row in rows]
+    ).splitlines()
+    commits = [
+        Commit(
+            sha=row[0],
+            parent=row[1],
+            tree=row[2],
+            parent_tree=ptree,
+            subject=row[3] if len(row) > 3 else "",
+        )
+        for row, ptree in zip(rows, parent_trees)  # noqa: B905 (Python 3.9 has no strict=)
+    ]
+    index_of = {c.sha: i for i, c in enumerate(commits)}
+
+    by_index: dict[int, list[str]] = {}
+    for line in git(
+        "for-each-ref", "--format=%(objectname) %(refname:short)", "refs/heads"
+    ).splitlines():
+        sha, name = line.split(" ", 1)
+        if sha in index_of:
+            by_index.setdefault(index_of[sha], []).append(name)
+    duplicates = [names for names in by_index.values() if len(names) > 1]
+    if duplicates:
+        listing = "; ".join(", ".join(names) for names in duplicates)
+        raise StackError(
+            f"branches share a tip commit ({listing}); each PR branch needs its own tip"
+        )
+    branches = [Branch(name=names[0], index=i) for i, names in sorted(by_index.items())]
+
+    above = [
+        name
+        for name in git(
+            "for-each-ref",
+            "--contains",
+            "HEAD",
+            "--format=%(refname:short)",
+            "refs/heads",
+        ).splitlines()
+        if name != current
+    ]
+    if above:
+        raise StackError(
+            f"branches {', '.join(above)} contain {current}; "
+            "run from the top branch of the stack"
+        )
+    return Stack(
+        base_ref=base_ref,
+        base=commits[0].parent,
+        commits=commits,
+        branches=branches,
+        current=current,
+    )
+
+
+def select(
+    stack: Stack, names: list[str], *, all_: bool, first: bool, last: bool
+) -> list[Branch]:
+    """Resolve selectors (branch names, 1-based positions, --all/--first/--last)."""
+    chosen: dict[str, Branch] = {}
+    if all_:
+        chosen.update((b.name, b) for b in stack.branches)
+    if first:
+        chosen[stack.branches[0].name] = stack.branches[0]
+    if last:
+        chosen[stack.branches[-1].name] = stack.branches[-1]
+    by_name = {b.name: b for b in stack.branches}
+    for sel in names:
+        if sel in by_name:
+            chosen[sel] = by_name[sel]
+        elif sel.isdigit() and 1 <= int(sel) <= len(stack.branches):
+            branch = stack.branches[int(sel) - 1]
+            chosen[branch.name] = branch
+        else:
+            raise StackError(
+                f"{sel!r} is not a stack branch or position (see `stack-ci status`)"
+            )
+    if not chosen:
+        raise StackError(
+            "select branches by name or position, or pass --all, --first or --last"
+        )
+    return [b for b in stack.branches if b.name in chosen]
+
+
+def recommit(sha: str, parent: str) -> str:
+    """Recreate commit sha on a new parent with the same tree, author and message."""
+    raw = git("cat-file", "commit", sha, strip=False)
+    header, _, message = raw.partition("\n\n")
+    tree = ""
+    env = dict(os.environ)
+    for line in header.splitlines():
+        if line.startswith("tree "):
+            tree = line[5:]
+        elif line.startswith("author "):
+            ident, ts, tz = line[7:].rsplit(" ", 2)
+            name, _, email = ident.partition(" <")
+            env["GIT_AUTHOR_NAME"] = name
+            env["GIT_AUTHOR_EMAIL"] = email.rstrip(">")
+            env["GIT_AUTHOR_DATE"] = f"{ts} {tz}"
+    return git("commit-tree", tree, "-p", parent, env=env, stdin=message)
+
+
+def marker_message(branch: str) -> str:
+    return f"ci: skip checks on {branch} {MARKER_TAG}"
+
+
+def rewrite(stack: Stack, drop: set[str], add_to: set[str]) -> dict[str, str]:
+    """
+    Drop the marker shas in drop and add markers on the branches in add_to.
+
+    Returns the new tip sha for every branch whose tip changed.  Commits below
+    the first change keep their shas.
+    """
+    tip_at = {b.index: b.name for b in stack.branches}
+    tips: dict[str, str] = {}
+    head = stack.base
+    for i, c in enumerate(stack.commits):
+        if c.sha in drop:
+            pass  # the marker's tree equals its parent's, so nothing is lost
+        elif head == c.parent:
+            head = c.sha
+        else:
+            head = recommit(c.sha, head)
+        name = tip_at.get(i)
+        if name is not None:
+            if name in add_to:
+                head = git(
+                    "commit-tree", c.tree, "-p", head, "-m", marker_message(name)
+                )
+            if head != c.sha:
+                tips[name] = head
+    return tips
+
+
+def update_refs(stack: Stack, tips: dict[str, str]) -> None:
+    """Move branch refs atomically, checking each still points where it did."""
+    lines = ["start"]
+    for b in stack.branches:
+        if b.name in tips:
+            lines.append(
+                f"update refs/heads/{b.name} {tips[b.name]} {stack.tip(b).sha}"
+            )
+    lines += ["prepare", "commit", ""]
+    git("update-ref", "-m", "stack-ci", "--stdin", stdin="\n".join(lines))
+
+
+def report_changes(stack: Stack, tips: dict[str, str]) -> None:
+    if not tips:
+        print("No changes.")
+        return
+    changed = [b.name for b in stack.branches if b.name in tips]
+    print(f"Rewrote {len(changed)} branch(es): {' '.join(changed)}")
+    print(
+        "Nothing was pushed. Push (only when the user asks) with: "
+        "gh stack push (or stack-ci push)"
+    )
+
+
+def remote_state(remote: str, branch: str, local_sha: str) -> str:
+    ref = f"refs/remotes/{remote}/{branch}"
+    if not git_ok("rev-parse", "-q", "--verify", ref):
+        return "not pushed"
+    return "in sync" if git("rev-parse", ref) == local_sha else "differs"
+
+
+def cmd_status(stack: Stack, remote: str) -> None:
+    print(f"base: {stack.base_ref} ({stack.base[:10]})")
+    width = max(len(b.name) for b in stack.branches)
+    print(f"  #  {'branch'.ljust(width)}  CI       {remote}")
+    for pos, b in enumerate(stack.branches, start=1):
+        tip = stack.tip(b)
+        ci = "skipped" if tip.is_marker else "runs"
+        print(
+            f"{pos:3}  {b.name.ljust(width)}  {ci:7}  "
+            f"{remote_state(remote, b.name, tip.sha)}"
+        )
+    tip_indexes = {b.index for b in stack.branches}
+    stray = [
+        c for i, c in enumerate(stack.commits) if c.is_marker and i not in tip_indexes
+    ]
+    for c in stray:
+        print(f"warning: marker {c.sha[:10]} is not a branch tip and has no effect")
+    print(f"('{remote}' state is from the last fetch)")
+
+
+def cmd_enable(stack: Stack, branches: list[Branch]) -> None:
+    drop: set[str] = set()
+    prev_tips = {stack.base} | {stack.tip(b).sha for b in stack.branches}
+    for b in branches:
+        tip = stack.tip(b)
+        if not tip.is_marker:
+            print(f"{b.name}: CI already runs")
+        elif tip.parent in prev_tips:
+            raise StackError(f"{b.name} has no commits besides its marker")
+        else:
+            drop.add(tip.sha)
+    tips = rewrite(stack, drop, set())
+    update_refs(stack, tips)
+    report_changes(stack, tips)
+
+
+def cmd_disable(stack: Stack, branches: list[Branch]) -> None:
+    add_to: set[str] = set()
+    for b in branches:
+        if stack.tip(b).is_marker:
+            print(f"{b.name}: CI already skipped")
+        else:
+            add_to.add(b.name)
+    tips = rewrite(stack, set(), add_to)
+    update_refs(stack, tips)
+    report_changes(stack, tips)
+
+
+def cmd_push(stack: Stack, remote: str, dry_run: bool) -> None:
+    pending = [
+        b.name
+        for b in stack.branches
+        if remote_state(remote, b.name, stack.tip(b).sha) != "in sync"
+    ]
+    if not pending:
+        print(f"All stack branches match {remote} (as of the last fetch).")
+        return
+    args = [
+        "push",
+        "--atomic",
+        "--force-with-lease",
+        "--set-upstream",
+        remote,
+        *pending,
+    ]
+    if dry_run:
+        args.insert(1, "--dry-run")
+    print("git " + " ".join(args), flush=True)
+    result = subprocess.run(["git", *args], check=False)
+    if result.returncode != 0:
+        raise StackError("push failed")
+
+
+def cmd_move(stack: Stack, commit: str, target: Branch) -> None:
+    sha = git("rev-parse", "--verify", f"{commit}^{{commit}}")
+    if sha not in {c.sha for c in stack.commits}:
+        raise StackError(f"{commit} is not in the stack")
+    if stack.commits[[c.sha for c in stack.commits].index(sha)].is_marker:
+        raise StackError("use enable/disable to manage marker commits")
+    if git("status", "--porcelain", "--untracked-files=no"):
+        raise StackError("the working tree has uncommitted changes")
+    tip = stack.tip(target)
+    env = dict(os.environ)
+    env.update(
+        {
+            "GIT_SEQUENCE_EDITOR": (
+                f'"{sys.executable}" "{os.path.abspath(__file__)}" _edit-todo'
+            ),
+            "GIT_EDITOR": ":",
+            ENV_MOVE_SHA: sha,
+            ENV_MOVE_BRANCH: target.name,
+            ENV_MOVE_CURRENT: "1" if target.name == stack.current else "",
+            ENV_MOVE_MARKER: tip.sha if tip.is_marker else "",
+        }
+    )
+    result = subprocess.run(
+        ["git", "rebase", "-i", "--update-refs", stack.base], env=env, check=False
+    )
+    if result.returncode != 0:
+        raise StackError(
+            "the rebase stopped; resolve conflicts and run "
+            "`git rebase --continue`, or `git rebase --abort`"
+        )
+    print(f"Moved {sha[:10]} into {target.name}. Nothing was pushed.")
+
+
+def _is_pick(line: str, sha: str) -> bool:
+    parts = line.split()
+    return len(parts) >= 2 and parts[0] in ("pick", "p") and sha.startswith(parts[1])
+
+
+def edit_todo(path: str) -> None:
+    """Sequence editor for `move`: put the pick line before the target's marker."""
+    sha = os.environ[ENV_MOVE_SHA]
+    branch = os.environ[ENV_MOVE_BRANCH]
+    marker = os.environ.get(ENV_MOVE_MARKER, "")
+    with open(path, encoding="utf-8") as f:
+        lines = f.read().splitlines()
+    moved = [i for i, line in enumerate(lines) if _is_pick(line, sha)]
+    if len(moved) != 1:
+        sys.exit(f"stack-ci: could not find 'pick {sha[:10]}' in the rebase todo")
+    pick_line = lines.pop(moved[0])
+    if os.environ.get(ENV_MOVE_CURRENT):
+        anchor = len(lines)
+    else:
+        refs = [
+            i
+            for i, line in enumerate(lines)
+            if line.strip() == f"update-ref refs/heads/{branch}"
+        ]
+        if len(refs) != 1:
+            sys.exit(
+                f"stack-ci: could not find 'update-ref refs/heads/{branch}' "
+                "in the rebase todo"
+            )
+        anchor = refs[0]
+    last = next(
+        (
+            i
+            for i in range(anchor - 1, -1, -1)
+            if lines[i].split()[:1] in (["pick"], ["p"])
+        ),
+        -1,
+    )
+    insert_at = (
+        last if marker and last >= 0 and _is_pick(lines[last], marker) else last + 1
+    )
+    lines.insert(insert_at, pick_line)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="stack-ci",
+        description=(
+            "Skip or run GitHub Actions CI per PR branch in a stack. "
+            "Run from the top branch."
+        ),
+    )
+    parser.add_argument(
+        "--base", help=f"stack base ref (default: ${ENV_BASE}, then <remote>/HEAD)"
+    )
+    parser.add_argument(
+        "--remote",
+        default="origin",
+        help="remote to compare and push to (default: origin)",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("status", help="list stack branches, CI state and remote state")
+    for name, text in (
+        ("enable", "drop markers so the next push runs CI"),
+        ("disable", "add markers to skip CI"),
+    ):
+        p = sub.add_parser(name, help=text)
+        p.add_argument("branches", nargs="*", help="branch names or 1-based positions")
+        p.add_argument(
+            "--all", action="store_true", dest="all_", help="every branch in the stack"
+        )
+        p.add_argument("--first", action="store_true", help="the bottom branch")
+        p.add_argument("--last", action="store_true", help="the top branch")
+    p = sub.add_parser(
+        "push", help="force-push (with lease) branches that differ from the remote"
+    )
+    p.add_argument("--dry-run", action="store_true")
+    p = sub.add_parser("move", help="move a commit into a PR branch, before its marker")
+    p.add_argument("commit")
+    p.add_argument("branch", help="branch name or 1-based position")
+    return parser
+
+
+def main(argv: list[str]) -> int:
+    if argv[:1] == ["_edit-todo"]:
+        edit_todo(argv[1])
+        return 0
+    args = build_parser().parse_args(argv)
+    try:
+        stack = load_stack(resolve_base(args.base, args.remote))
+        if args.command == "status":
+            cmd_status(stack, args.remote)
+        elif args.command in ("enable", "disable"):
+            branches = select(
+                stack, args.branches, all_=args.all_, first=args.first, last=args.last
+            )
+            (cmd_enable if args.command == "enable" else cmd_disable)(stack, branches)
+        elif args.command == "push":
+            cmd_push(stack, args.remote, args.dry_run)
+        elif args.command == "move":
+            [target] = select(stack, [args.branch], all_=False, first=False, last=False)
+            cmd_move(stack, args.commit, target)
+    except StackError as e:
+        print(f"stack-ci: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -56,6 +56,10 @@ ssh disconnects but not VM restarts).
   `~/.cache/mcpcli`); `aws-mcp` skill holds the AWS MCP / Logs Insights cost
   rules that its `logs` subcommand enforces — keep them in sync. Keep
   account IDs and org-specific profile names out (this repo is public)
+- `agents/skills/github-pr-stack/scripts/stack-ci` — `[skip ci]` marker tool
+  for GitHub PR stacks; a copy of `ces_common/agent_docs/skills/pr-stack/scripts/stack-ci`
+  in WashPost/content-enhancement-service. Keep the two in sync, and keep
+  org-specific details out of the skill (this repo is public)
 - `bin/<name>` — scripts, copied by `install.sh link`/`scripts` to
   `~/.local/share/dotfiles/bin/` and linked from `~/.local/bin/`
   (`install_scripts`). Copied, not linked into the repo, because programs

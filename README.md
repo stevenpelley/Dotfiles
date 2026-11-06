@@ -70,6 +70,7 @@ sessions.
 | `address-review` | Address review comments recorded in Neovim/diffview (see [config/nvim/README.md](config/nvim/README.md#review-comments-for-coding-agents)) |
 | `sbx-mcp-client` | `mcpcli`: call MCP servers on the Docker Sandboxes MCP gateway from the shell, so the agent controls how much of each response enters its context |
 | `aws-mcp` | Rules for the AWS MCP Server: avoiding `run_script` timeouts, and estimate-gated, budgeted CloudWatch Logs Insights queries |
+| `github-pr-stack` | GitHub only: stacked PRs on one linear branch with git and `gh stack`, and `scripts/stack-ci` to skip or run Actions CI per PR with `[skip ci]` marker commits |
 
 Agent instructions
 ------------------

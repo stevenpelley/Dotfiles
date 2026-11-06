@@ -51,3 +51,10 @@ Estimate tokens as file bytes ÷ 4. For N sub-agents, the duplicated cost is
 - Files the main session has already loaded favor working in series: there
   they are already paid for.
 - When delegating, pass the relevant sections rather than whole files.
+
+## Stacked pull requests (GitHub only)
+
+For stacked PRs in a GitHub repository, follow the `github-pr-stack` skill
+(`~/Dotfiles/agents/skills/github-pr-stack/`), unless the repository has its
+own PR-stack skill or instructions; those take precedence. It does not apply
+to other hosts.

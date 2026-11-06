@@ -63,12 +63,31 @@ Inside a Docker sandbox, call it with the `sbx-mcp-client` skill's `mcpcli`
 
 ## 3. Permissions observed (read-only MCP roles)
 
-- `logs:StartQuery`, `GetQueryResults`, `DescribeQueries` and `StopQuery`
-  worked; on the roles tested they came from an inline policy, not from the
-  `ViewOnlyAccess` managed policy.
+What a role allows depends on how its owner defined it, so check what you are
+signed in as (`sts:GetCallerIdentity`) and expect `AccessDenied` on reads the
+role was never given.
+
+- **omp-playground (`maret-dev-agent-readonly`, account 200548549443),
+  since 2026-11-06:** `ReadOnlyAccess` + `CloudWatchReadOnlyAccess` across
+  the account, minus explicit denies (`maret/infra/cdk/auth_stack.py`):
+  - `kms:Decrypt` and `kms:ReEncrypt*`: SecureString parameters come back as
+    ciphertext without `WithDecryption`, and `WithDecryption` is refused;
+  - `secretsmanager:GetSecretValue`;
+  - reads that return credentials or secrets, such as `sts:GetSessionToken`,
+    ECR and CodeArtifact authorization tokens, and
+    `cognito-idp:DescribeUserPoolClient`;
+  - `sqs:ReceiveMessage`;
+  - `s3:GetObject*` on raw mail (`maret-<stage>-raw/*`).
+
+  Route 53, CloudFront, ACM, IAM, SSM metadata and every log group are
+  readable, including `logs:FilterLogEvents`. A denied `HeadObject` shows
+  only as a bare `403 Forbidden`, with no AccessDenied text.
+- **Earlier and other roles** (ViewOnlyAccess plus an inline policy):
+  `logs:StartQuery`, `GetQueryResults`, `DescribeQueries` and `StopQuery`
+  came from the inline policy, not from `ViewOnlyAccess`;
+  `logs:FilterLogEvents` was denied, so log reads went through Logs Insights.
 - `StopQuery` cancels a query started by mistake; assume what it scanned
   before the stop is still billed (not verified).
-- `logs:FilterLogEvents` was denied, so log reads go through Logs Insights.
 
 ## 4. CloudWatch Logs Insights
 

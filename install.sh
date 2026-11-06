@@ -11,7 +11,7 @@
 #   bash install.sh instructions  # only the agent-instructions links
 #   bash install.sh scripts  # only bin/* (copied to ~/.local/share/dotfiles/bin,
 #                            # linked from ~/.local/bin); link also does this
-#   bash install.sh install  # install tooling (gh, pinned nvim + tree-sitter CLI, LSPs,
+#   bash install.sh install  # install tooling (gh + gh-stack extension, pinned nvim + tree-sitter CLI, LSPs,
 #                            # zellij, lefthook, oh-my-bash, pipx tools)
 #   bash install.sh all      # install then link (order matters: oh-my-bash
 #                            # replaces ~/.bashrc, so linking must come after)
@@ -549,9 +549,29 @@ install_gh() {
     gh --version | head -1
 }
 
+# Official gh extensions. `gh extension install` works without gh auth but
+# fails when the extension is already installed; `list` and `upgrade` need
+# auth. So detect installed extensions on disk, and upgrade only when gh is
+# authenticated (the kit's install hook may run before GH_TOKEN is set).
+GH_EXTENSIONS="github/gh-stack"
+install_gh_extensions() {
+  command -v gh > /dev/null || { echo "gh extensions: gh not installed, skipping"; return 1; }
+  local ext dir="${XDG_DATA_HOME:-$HOME/.local/share}/gh/extensions"
+  for ext in $GH_EXTENSIONS; do
+    if [ ! -d "$dir/${ext#*/}" ]; then
+      gh extension install "$ext" || echo "gh extensions: could not install $ext"
+    elif gh auth status > /dev/null 2>&1; then
+      gh extension upgrade "${ext#*/gh-}" || echo "gh extensions: could not upgrade $ext"
+    else
+      echo "gh extensions: $ext installed; not authenticated, skipping upgrade"
+    fi
+  done
+}
+
 install_commons() {
   ensure_linux_tooling
   install_gh
+  install_gh_extensions
   install_nvim
   install_tree_sitter
   install_lsps

@@ -18,7 +18,7 @@ ssh disconnects but not VM restarts).
   login shell, interactive or not: `su -l`, `bash -l -c`) and by
   `config/bash/bashrc`; idempotent. `bashrc` keeps its interactive guard, so
   anything a script or kit hook needs belongs in `env`, not `bashrc`
-- `install.sh` — `link` (symlinks), `install` (tooling: zellij, lefthook, oh-my-bash, pipx tools), `all`
+- `install.sh` — `link` (symlinks), `install` (tooling: gh and gh extensions (`GH_EXTENSIONS`), zellij, lefthook, oh-my-bash, pipx tools), `all`
 - `sbx/dotfiles/dotfiles.yaml` — Docker Sandboxes **v3** mixin kit
   (thin-kit pattern, declaration-only): its install hook clones this repo
   into `/home/agent/Dotfiles` and runs `install.sh all` as the `agent` user;

@@ -7,7 +7,7 @@ Context for coding agents working in this repository.
 Symlink-based dotfiles (`install.sh`). The symlinks point from `$HOME` into
 this repo, so **edits here are live** in the user's shells/editors/zellij as
 soon as files exist (new files additionally need `bash install.sh link`).
-Environments: macOS host, and the `omp-playground` sandbox (arm64 Linux, PID 1
+Environments: macOS host, and Docker sandboxes such as `spelley-mono` (arm64 Linux, PID 1
 is `tini`, sudo available, no systemd/logind — background processes survive
 ssh disconnects but not VM restarts).
 
@@ -19,11 +19,16 @@ ssh disconnects but not VM restarts).
   `config/bash/bashrc`; idempotent. `bashrc` keeps its interactive guard, so
   anything a script or kit hook needs belongs in `env`, not `bashrc`
 - `install.sh` — `link` (symlinks), `install` (tooling: gh and gh extensions (`GH_EXTENSIONS`), zellij, lefthook, oh-my-bash, pipx tools), `all`
-- `sbx/dotfiles/dotfiles.yaml` — Docker Sandboxes **v3** mixin kit
-  (thin-kit pattern, declaration-only): its install hook clones this repo
-  into `/home/agent/Dotfiles` and runs `install.sh all` as the `agent` user;
-  a startup hook re-runs `install.sh link` every boot (log:
-  `~/.cache/dotfiles-link.log`).
+- `sbx/dotfiles/dotfiles.yaml` + `dotfiles.dockerfile` — Docker Sandboxes
+  **v3** mixin kit. The image build clones this repo into
+  `/home/agent/Dotfiles` and runs `install.sh all` as the `agent` user on
+  `docker/sandbox-templates:shell`; the overlay is `/home/agent`,
+  `/usr/local/share/npm-global` (LSPs) and `/usr/local/bin/gh`, cached by
+  sbx, so a create no longer runs the installer. The install hook only sets
+  the login shell, and runs `install.sh install` if the image's tools do not
+  run on the workload; a startup hook pulls the clone and re-runs
+  `install.sh link` every boot (log: `~/.cache/dotfiles-link.log`). After
+  changing a pin in `install.sh`, bump the kit `version` so sbx rebuilds.
   No files are duplicated — the repo stays the single source of truth.
   `sbxenv.yaml` is the user-home env file for Docker Sandboxes, linked as
   `~/.sbxenv.yaml` (the sandbox only reads the dot-prefixed name — it is not

@@ -105,13 +105,18 @@ Docker sandbox kit
 ------------------
 
 This repo is also a [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/)
-**v3 mixin kit** (`sbx/dotfiles/dotfiles.yaml`, thin-kit pattern): provisioning
-the kit clones this repository into `/home/agent/Dotfiles` and runs
-`install.sh all`, and a startup hook re-runs `install.sh link` on every boot
-(the create-time link runs before the agents' context dirs and CLIs exist, so
-it can miss harnesses). Nothing is duplicated — the kit's install hook installs
-from git, so upgrades inside an existing sandbox stay
-`git pull && bash install.sh link` (or `git pull` and a restart).
+**v3 mixin kit** (`sbx/dotfiles/dotfiles.yaml` + `dotfiles.dockerfile`): the
+kit image clones this repository into `/home/agent/Dotfiles` and runs
+`install.sh all` at build time, so sbx caches the result and a sandbox create
+downloads nothing for it. A startup hook fast-forwards the clone and re-runs
+`install.sh link` on every boot (link must run after the agents' context dirs
+and CLIs exist, or it misses harnesses). Nothing is duplicated — the image is
+built from git, so upgrades inside an existing sandbox stay
+`git pull && bash install.sh link` (or a restart). The image is built on the
+Ubuntu sandbox template; on a workload where its tools do not run (another
+python3), the install hook falls back to `install.sh install` in the sandbox.
+After changing install.sh's pins, bump the kit's `version` so the next create
+rebuilds the image.
 
 ```bash
 # one-time host prerequisite: allowlist this kit's Git source
@@ -130,8 +135,9 @@ v3 kits compose only with v3 kits, so those environments must use a v3
 workload (e.g. `docker.io/docker/sbx-kit-kiro` with `agent: sbx-kit-kiro`)
 rather than a built-in agent shortcut like `kiro`.
 
-The kit's `network-policy@1` hosts must cover everything `install.sh`
-downloads, in both the `install` phase (provisioning) and the `runtime` phase
+The image build runs on the host, outside the sandbox policy. The kit's
+`network-policy@1` hosts must still cover everything `install.sh` downloads,
+in both the `install` phase (the fallback above) and the `runtime` phase
 (in-sandbox upgrades): github.com, api.github.com, both GitHub asset hosts,
 codeload.github.com, raw.githubusercontent.com, pypi.org,
 files.pythonhosted.org, registry.npmjs.org, plus the Ubuntu apt mirrors for

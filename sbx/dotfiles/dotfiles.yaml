@@ -37,7 +37,7 @@ description: >-
   editor), lefthook, and pipx tools (jc, jello, jellex), all built into the
   kit image. Kit upgrades inside a running sandbox are simply `git pull` in
   /home/agent/Dotfiles followed by `bash install.sh link`.
-version: "1.2.0"
+version: "1.2.1"
 sourceUrl: https://github.com/stevenpelley/Dotfiles
 # No licenses: the repository carries no license file.
 

@@ -20,11 +20,27 @@
 # creates symlinks. Safe to re-run.
 ########################
 
+# Stop at the first failed step, so its error is the last thing in the log. A
+# step that may fail without stopping the install has to say so with `||`.
+# Not pipefail: `... | head -1` and the like would count as failures.
+set -e
+
 # Tools land in ~/.local/bin, and harness detection (agent_targets) looks for
 # CLIs there (omp, claude). The user's PATH setup (config/bash/env) is not
 # linked yet on a first run, and a sandbox kit hook's `su -l` shell starts
 # with the system PATH only, so put it on PATH here.
 case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
+
+# Print a URL's content, retrying transient failures (GitHub answers 5xx now
+# and then). Through a file because a retry after a partial transfer would
+# repeat the data on stdout; curl truncates a file before retrying.
+fetch() {
+  local tmp status=0
+  tmp=$(mktemp)
+  curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o "$tmp" "$1" && cat "$tmp" || status=$?
+  rm -f "$tmp"
+  return $status
+}
 
 link_configs() {
   dir=~/Dotfiles                    # dotfiles directory
@@ -275,6 +291,11 @@ NVIM_VERSION=v0.12.5
 # Official release binary (glibc on Linux); not npm, which nvim-treesitter
 # does not support.
 TREE_SITTER_VERSION=v0.27.0
+# zellij and lefthook, where they come from GitHub release binaries (brew has
+# its own version). Pinned rather than looked up in GitHub's releases API: one
+# 5xx from the API used to fail a whole kit image build.
+ZELLIJ_VERSION=v0.45.1
+LEFTHOOK_VERSION=v2.2.2
 
 # release-asset OS name, shared by the neovim and tree-sitter release naming
 release_os() {
@@ -342,7 +363,7 @@ install_nvim() {
     esac
     dest=~/.local/opt/nvim-${NVIM_VERSION}
     mkdir -p "$dest" ~/.local/bin
-    if ! curl -fsSL "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-${os}-${arch}.tar.gz" |
+    if ! fetch "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-${os}-${arch}.tar.gz" |
       tar xz -C "$dest" --strip-components=1; then
       echo "nvim: download/extract of ${NVIM_VERSION} failed"
       return 1
@@ -375,7 +396,7 @@ install_tree_sitter() {
       ;;
   esac
   mkdir -p ~/.local/bin
-  if ! curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_VERSION}/tree-sitter-${os}-${arch}.gz" |
+  if ! fetch "https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_VERSION}/tree-sitter-${os}-${arch}.gz" |
     gunzip > ~/.local/bin/tree-sitter.partial; then
     echo "tree-sitter: download of ${TREE_SITTER_VERSION} failed"
     return 1
@@ -421,15 +442,9 @@ install_zellij() {
       return 1
       ;;
   esac
-  version=$(curl -fsSL https://api.github.com/repos/zellij-org/zellij/releases/latest |
-    grep -m1 '"tag_name"' | cut -d'"' -f4)
-  if [ -z "$version" ]; then
-    echo "zellij: could not determine latest release, skipping"
-    return 1
-  fi
-  url="https://github.com/zellij-org/zellij/releases/download/${version}/zellij-${zj_arch}-unknown-linux-musl.tar.gz"
+  url="https://github.com/zellij-org/zellij/releases/download/${ZELLIJ_VERSION}/zellij-${zj_arch}-unknown-linux-musl.tar.gz"
   tmpdir=$(mktemp -d)
-  curl -fsSL "$url" | tar xz -C "$tmpdir"
+  fetch "$url" | tar xz -C "$tmpdir"
   mkdir -p ~/.local/bin
   install -m755 "$tmpdir/zellij" ~/.local/bin/zellij
   rm -rf "$tmpdir"
@@ -461,15 +476,9 @@ install_lefthook() {
       ;;
     *) echo "lefthook: unsupported OS $(uname -s), skipping"; return 1 ;;
   esac
-  version=$(curl -fsSL https://api.github.com/repos/evilmartians/lefthook/releases/latest |
-    grep -m1 '"tag_name"' | cut -d'"' -f4)
-  if [ -z "$version" ]; then
-    echo "lefthook: could not determine latest release, skipping"
-    return 1
-  fi
-  url="https://github.com/evilmartians/lefthook/releases/download/${version}/lefthook_${version#v}_${lh_target}"
+  url="https://github.com/evilmartians/lefthook/releases/download/${LEFTHOOK_VERSION}/lefthook_${LEFTHOOK_VERSION#v}_${lh_target}"
   tmpfile=$(mktemp)
-  curl -fsSL "$url" -o "$tmpfile"
+  fetch "$url" > "$tmpfile"
   mkdir -p ~/.local/bin
   install -m755 "$tmpfile" ~/.local/bin/lefthook
   rm -f "$tmpfile"
@@ -527,7 +536,7 @@ install_gh() {
   local list=/etc/apt/sources.list.d/github-cli.list
   local tmp source
   tmp=$(mktemp)
-  if ! curl -fsSL -o "$tmp" https://cli.github.com/packages/githubcli-archive-keyring.gpg; then
+  if ! fetch https://cli.github.com/packages/githubcli-archive-keyring.gpg > "$tmp"; then
     echo "gh: could not download the apt signing key"
     rm -f "$tmp"
     return 1
@@ -578,8 +587,13 @@ install_commons() {
   install_zellij
   install_lefthook
 
-  # install oh-my-bash
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)" --unattended
+  # install oh-my-bash; its installer fails if it is already there. An
+  # assignment first, or set -e would not see a failed download.
+  if [ ! -d ~/.oh-my-bash ]; then
+    local omb_installer
+    omb_installer=$(fetch https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)
+    bash -c "$omb_installer" --unattended
+  fi
 
   # if have python then install jc, jello, jellex
   if which python3 > /dev/null && which brew > /dev/null; then

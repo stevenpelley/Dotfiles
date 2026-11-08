@@ -1,0 +1,11 @@
+{
+  "name": "dotfiles",
+  "owner": { "name": "Steven Pelley" },
+  "plugins": [
+    {
+      "name": "dotfiles",
+      "source": "./agents",
+      "description": "Agent skills from this Dotfiles repository"
+    }
+  ]
+}

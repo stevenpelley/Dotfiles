@@ -247,6 +247,17 @@ link_agent_instructions() {
   fi
 }
 
+# Claude Code gets the skills as a plugin where it can't take the links: agents/
+# is the plugin's root, read in place, so a git pull updates it. The skills are
+# then named dotfiles:<skill>. Both commands are safe to re-run. stdin is the
+# caller's read loop, and claude would consume it.
+link_claude_plugin() {
+  echo "Registering the skills as a Claude Code plugin"
+  { claude plugin marketplace add ~/Dotfiles --scope user \
+    && claude plugin install dotfiles@dotfiles --scope user; } < /dev/null \
+    || echo "Could not register the Claude Code plugin; continuing"
+}
+
 link_agent_skills() {
   local dir=~/Dotfiles
   local olddir=~/Dotfiles_old
@@ -258,6 +269,7 @@ link_agent_skills() {
     # set -e a failed ln there would stop the rest of link
     if [ ! -w "$target" ]; then
       echo "Skipping skills for $harness: $target is not writable"
+      [ "$harness" != claude ] || link_claude_plugin
       continue
     fi
     # drop links to skills that were removed from this repo

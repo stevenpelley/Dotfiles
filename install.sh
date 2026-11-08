@@ -254,6 +254,12 @@ link_agent_skills() {
   while read -r harness target instructions; do
     found=1
     mkdir -p "$target"
+    # the sbx Claude kit mounts the host's ~/.claude/skills read-only; under
+    # set -e a failed ln there would stop the rest of link
+    if [ ! -w "$target" ]; then
+      echo "Skipping skills for $harness: $target is not writable"
+      continue
+    fi
     # drop links to skills that were removed from this repo
     for link in "$target"/*; do
       if [ -L "$link" ] && [ ! -e "$link" ]; then

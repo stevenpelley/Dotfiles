@@ -34,11 +34,13 @@ WORKDIR /home/agent
 # The repository itself, at the ref the Kit's `ref` arg names. A clone, not
 # the build context: the context is only sbx/dotfiles/, and the config
 # symlinks need the whole tree. origin and the branch are set so an in-
-# sandbox `git pull` (the startup hook) works.
+# sandbox `git pull` (the startup hook) works. ADD leaves a local tag named
+# after the ref, which makes a plain `git push origin main` ambiguous.
 ARG DOTFILES_REF
 ADD --keep-git-dir=true --chown=1000:1000 \
     "https://github.com/stevenpelley/Dotfiles.git#${DOTFILES_REF}" /home/agent/Dotfiles
 RUN { git -C ~/Dotfiles remote remove origin 2> /dev/null || true; } \
+    && { git -C ~/Dotfiles tag -d "${DOTFILES_REF}" > /dev/null 2>&1 || true; } \
     && git -C ~/Dotfiles remote add origin https://github.com/stevenpelley/Dotfiles \
     && git -C ~/Dotfiles fetch -q origin "${DOTFILES_REF}" \
     && git -C ~/Dotfiles checkout -q -B "${DOTFILES_REF}" FETCH_HEAD \

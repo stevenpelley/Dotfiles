@@ -2,8 +2,9 @@
 """Read and update review comments recorded in Neovim (config/nvim/lua/agent_review.lua).
 
 Store: <git-common-dir>/agent-review/comments.jsonl, one JSON object per line,
-shared by all worktrees of the repository. See agent_review.lua for the schema;
-keep the two in sync.
+shared by all worktrees of the repository. Comments may have been made in
+another worktree than this one (field `repo`, e.g. a :DiffviewStack review
+worktree). See agent_review.lua for the schema; keep the two in sync.
 
     review.py path                       print the store path
     review.py list [--all|--status S] [--json]
@@ -149,9 +150,19 @@ def render(c: dict, repo: str | None) -> str:
     if c.get("other_rev"):
         viewed += f", diffed against {short(c['other_rev'])}"
     viewed += ")"
-    if c.get("head"):
-        viewed += f"; HEAD at review: {c['head']}"
     out.append(viewed)
+    if c.get("repo") or c.get("head_sha") or c.get("head"):
+        where = f"reviewed in worktree: {c.get('repo', '?')}"
+        here = git("rev-parse", "--show-toplevel", cwd=repo)
+        if c.get("repo") and here and os.path.realpath(c["repo"]) != os.path.realpath(here):
+            where += " (another worktree: read code/uncommitted changes there, make changes here)"
+        head = c.get("head")
+        sha = c.get("head_sha")
+        if sha or head:
+            where += f"; HEAD {short(sha) if sha else head}"
+            if head and head != sha:
+                where += f" ({head})"
+        out.append(where)
     if c.get("other_path"):
         out.append(f"other side path: {c['other_path']}")
     commits = c.get("commits") or []

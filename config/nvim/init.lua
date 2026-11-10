@@ -257,6 +257,9 @@ require("lazy").setup({
 -- diffview or plain buffers and consumed by the address-review agent skill.
 -- See lua/agent_review.lua.
 require("agent_review").setup()
+-- :DiffviewStack [base] [top]: one diffview tab per PR branch of a stack.
+-- See lua/diffview_stack.lua.
+require("diffview_stack").setup()
 
 local lsp_augroup = vim.api.nvim_create_augroup("lsp-maps", { clear = true })
 -- buffer-locally on LspAttach so non-LSP buffers keep vim's built-in gd/K.

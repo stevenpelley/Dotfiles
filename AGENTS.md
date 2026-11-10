@@ -47,6 +47,11 @@ ssh disconnects but not VM restarts).
   diffview, stored in `<git-common-dir>/agent-review/comments.jsonl`; its
   schema is shared with `agents/skills/address-review/scripts/review.py`
   — change both together
+- `config/nvim/lua/diffview_stack.lua` — `:DiffviewStack`, one diffview tab
+  per branch of a PR stack, each in its own detached review worktree under
+  `~/.cache/nvim/diffview-stack/` (see `config/nvim/README.md`). Comments
+  made there carry that worktree as `repo`; the `address-review` skill
+  must keep making its changes in the agent's own worktree
 - `agents/skills/<name>/` — Agent Skills, symlinked per skill by
   `install.sh link`/`skills` into each detected harness (`agent_targets`)
 - `agents/instructions.md` — user-level agent instructions, linked by

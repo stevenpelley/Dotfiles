@@ -49,7 +49,20 @@ unique prefix.
   diff); `commits` lists commits between `rev` and `other_rev` touching the
   file. Use `git log -L<start>,<end>:<path>` or the diff to pick the one that
   made the change.
-- `UNCOMMITTED` → the lines are working-tree changes; just edit the files.
+- `repo` is the worktree the user reviewed in and `head_sha` the commit
+  checked out there (`head`: its branch, if any). This is often **not your
+  worktree**: `:DiffviewStack` gives every PR of a stack its own review
+  worktree at a detached HEAD, under `~/.cache/nvim/diffview-stack/`. The
+  listing says "another worktree" when it differs from where you run it.
+  Read code there if useful (`git -C <repo> ...`), but never edit, commit,
+  check out, clean or remove anything in another worktree.
+- `UNCOMMITTED` → the lines are working-tree changes in `repo`. If `repo` is
+  your worktree, just edit the files. If it is another worktree, the user is
+  commenting on edits that exist only there: find them with
+  `git -C <repo> diff <head_sha>`, and if the comment asks for them (or for
+  changes to them), make the change in your worktree on the PR branch that
+  owns `head_sha`, following the normal rules below. Leave the other
+  worktree as it is.
 - A commit outside the stack (already on the trunk) means the user commented
   on unchanged context; the fix belongs in the commit of the stack the
   comment is really about — usually the one being reviewed (`rev` or
@@ -61,8 +74,10 @@ unique prefix.
 
 1. `review.py list`. If nothing is open, say so and stop.
 2. Understand the stack: `git log --oneline --decorate --graph <trunk>..<top>`
-   for the top branch of the stack. Check `git status` is clean before
-   touching branches; never discard user changes.
+   for the top branch of the stack. All changes below are made in **the
+   worktree your session primarily works in**, wherever the comments were
+   made. Check `git status` is clean there before touching branches; never
+   discard user changes.
 3. Triage every comment before editing:
    - clear change request → fix it;
    - question, or ambiguous/contested request → `reply` (comment stays open)
@@ -79,8 +94,9 @@ unique prefix.
      pick the commit that made the change first (see above).
    - Commit on the trunk / unchanged context → the PR branch being reviewed
      (the one owning `rev`, or `other_rev` for old-side comments).
-   - `UNCOMMITTED` → no branch; edit the working tree and leave it
-     uncommitted.
+   - `UNCOMMITTED` in your worktree → no branch; edit the working tree and
+     leave it uncommitted. In another worktree → the PR branch owning
+     `head_sha` (see above).
 5. Work **bottom-up**, one target branch at a time, starting with the branch
    closest to the trunk (so each fix commit is never rewritten by a later
    restack):
@@ -102,7 +118,8 @@ unique prefix.
       Skip if `<target-branch>` is the top. Check afterwards that every stack
       branch moved (`git log --oneline --decorate --graph <trunk>..<top>`) —
       `--update-refs` does not move branches checked out in another worktree;
-      report those. On conflicts, resolve only if the resolution is obvious
+      report those (review worktrees are detached and never block it). On
+      conflicts, resolve only if the resolution is obvious
       and mechanical; otherwise `git rebase --abort` and report.
    4. Rerun tests on the upper branches if the fix could affect them.
 6. Reply on every comment you handled: `resolve <id> -m "<what changed, where>"
@@ -113,7 +130,8 @@ unique prefix.
    checked out.
 8. Report: per comment, one line — id, file/context, what you did (fixed in
    `<sha>` on `<branch>`, replied with a question, won't fix), which branches
-   were restacked, and test results.
+   were restacked, and test results. If comments came from review worktrees,
+   note that re-running `:DiffviewStack` moves them to the new branch tips.
 
 Step 5.3 rewrites the commits of the upper branches. Running this skill is
 the user's explicit request to do so; it does not license rewriting any

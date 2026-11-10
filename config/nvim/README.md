@@ -145,6 +145,60 @@ lazygit). `:Inspect` with the cursor on a token shows exactly what is coloring
 it and why. `:h index` lists every built-in key; plugins document themselves
 under `:h <plugin>`.
 
+## Reviewing a PR stack
+
+`:DiffviewStack [--create-envs] [base] [top]` (`lua/diffview_stack.lua`)
+opens one diffview tab per branch of a stack, each diffing the branch against
+the branch below it (`parent...branch`, against their merge-base). Each tab
+shows the same collapsed diff as that branch's GitHub PR. `gt` / `gT` move
+between PRs; `<Tab>` / `<S-Tab>` move between files inside one. `base`
+defaults to `main` (or `master`), `top` to `HEAD`. The stack is every local
+branch whose tip is on `base..top`, bottom first. If several branches point
+at one commit, the checked-out one wins, else the first alphabetically (a
+warning lists them). Commits above the last branch get a final tab of their
+own.
+
+LSP (`gd`, `K`, `grr`, ...) only works in working-tree buffers: Neovim's LSP
+never attaches to diffview's revision buffers (`buftype=nowrite`). So every
+PR gets a working tree and its tab is opened with `--imply-local`, making the
+right side real files with full LSP:
+
+- the PR checked out in your current worktree uses that worktree;
+- every other PR gets a **review worktree** at a detached HEAD in
+  `~/.cache/nvim/diffview-stack/<repo>-<hash>/<branch>`. Detached, so the
+  branches can still be checked out anywhere and `git rebase --update-refs`
+  (the `address-review` restack) still moves them. Each worktree runs its own
+  language servers.
+
+Re-run `:DiffviewStack` after the stack changes (e.g. the agent added fix
+commits): each review worktree moves to its branch's new tip. A review
+worktree with uncommitted changes to tracked files is left where it is, with
+a warning, and its tab opens without LSP.
+
+Dependencies: by default the venv (`$UV_PROJECT_ENVIRONMENT`, else `.venv`)
+and `node_modules` of your current worktree are symlinked into each review
+worktree. That is instant, but a PR that adds, removes or upgrades
+dependencies resolves against your current worktree's versions, so
+intermediate PRs can show wrong errors or unresolved imports. With
+`--create-envs` each review worktree instead installs its own from that PR's
+lockfile (`uv sync --frozen`; `npm ci`, `pnpm`/`yarn install
+--frozen-lockfile`), replacing the symlinks; installs block nvim while they
+run and are repeated only when the lockfile changed. Without a lockfile or
+the installer, it falls back to the symlink. An absolute
+`UV_PROJECT_ENVIRONMENT` is one shared venv, so it is never linked or
+created.
+
+`:DiffviewStackClean` closes the review worktrees' tabs and buffers, stops
+their language servers and removes all of the repository's review
+worktrees. It asks first if one has uncommitted changes; `!` skips the
+question.
+
+Review comments made in a review worktree record that worktree (`repo`) and
+its HEAD commit (`head_sha`); the `address-review` skill reads the code there
+but makes its fix commits in the agent's own worktree. For a single diff
+without worktrees, `:DiffviewOpen main...HEAD --imply-local` gives LSP on the
+checked-out side.
+
 ## Deliberate decisions
 
 - `colorscheme vim` — colorful but keeps the terminal's background.

@@ -20,8 +20,11 @@
 --   id          "r" + 6 hex chars
 --   status      "open" | "resolved" | "wontfix"
 --   created     ISO-8601 UTC
---   repo        worktree toplevel the comment was made in
---   head        branch (or detached SHA) checked out at review time
+--   repo        worktree toplevel the comment was made in; may be another
+--               worktree than the agent's, e.g. a :DiffviewStack review
+--               worktree. WORKTREE/UNCOMMITTED lines live in this worktree
+--   head        branch (or detached SHA) checked out in `repo` at review time
+--   head_sha    40-char SHA of `repo`'s HEAD at review time (always set)
 --   rev         viewed revision: 40-char SHA | "INDEX" | "WORKTREE"
 --   side        "old" | "new" (left / right side of the diff)
 --   other_rev   revision on the other side of the diff, if any
@@ -37,7 +40,7 @@
 --
 -- Signs/virtual text mark commented lines in diff and file buffers. Line
 -- numbers are those of the reviewed revision; WORKTREE comments do not follow
--- later edits.
+-- later edits, and only show in the worktree (`repo`) they were made in.
 
 local M = {}
 
@@ -431,6 +434,18 @@ local function place(buf, c)
   })
 end
 
+-- Does comment c belong to the revision/file shown at loc? WORKTREE and INDEX
+-- are per worktree, so those also need the same worktree.
+local function matches(c, loc)
+  if c.rev ~= loc.rev or c.path ~= loc.path then
+    return false
+  end
+  if (c.rev == "WORKTREE" or c.rev == "INDEX") and c.repo then
+    return c.repo == loc.top
+  end
+  return true
+end
+
 --- Redraw signs for every window in the current tabpage.
 function M.refresh()
   local loaded = {}
@@ -442,7 +457,7 @@ function M.refresh()
       if store then
         loaded[store] = loaded[store] or load(store)
         for _, c in ipairs(loaded[store]) do
-          if c.rev == loc.rev and c.path == loc.path then
+          if matches(c, loc) then
             place(loc.buf, c)
           end
         end
@@ -474,7 +489,7 @@ local function with_comment_at_cursor(fn)
   local line = api.nvim_win_get_cursor(0)[1]
   local hits = {}
   for _, c in ipairs(load(store)) do
-    if c.rev == loc.rev and c.path == loc.path and line >= (c.line_start or 0) and line <= (c.line_end or 0) then
+    if matches(c, loc) and line >= (c.line_start or 0) and line <= (c.line_end or 0) then
       table.insert(hits, c)
     end
   end
@@ -508,10 +523,11 @@ function M.add(s, e)
   local code = api.nvim_buf_get_lines(loc.buf, s - 1, e, false)
   local context = ts_context(loc.buf, s - 1)
   local commits = commits_for(loc, s, e)
+  local head_sha = vim.trim(git({ "rev-parse", "HEAD" }, { cwd = loc.top }) or "")
   local head = git({ "rev-parse", "--abbrev-ref", "HEAD" }, { cwd = loc.top })
   head = head and vim.trim(head)
   if head == "HEAD" then
-    head = vim.trim(git({ "rev-parse", "HEAD" }, { cwd = loc.top }) or "")
+    head = head_sha
   end
   local title = string.format("%s %s:%d-%d", short(loc.rev), loc.path, s, e)
   input("Review " .. title, nil, function(body)
@@ -521,6 +537,7 @@ function M.add(s, e)
       created = now(),
       repo = loc.top,
       head = head,
+      head_sha = head_sha ~= "" and head_sha or nil,
       rev = loc.rev,
       side = loc.side,
       other_rev = loc.other_rev,

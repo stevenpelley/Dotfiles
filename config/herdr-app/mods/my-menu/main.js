@@ -5,7 +5,7 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { run, props, closeOverlay, openOverlay, theme, keys, terminals, spaces, panes, exec } from "herdr";
+import { run, props, closeOverlay, openOverlay, theme, keys, terminals, spaces, panes, exec, notify } from "herdr";
 
 // Where a space is now: its first terminal's live folder, else where it was made.
 function place(s) {
@@ -21,9 +21,25 @@ async function checkout(folder, on) {
   return common.stdout.trim() === `${top.stdout.trim()}/.git` ? "main" : "linked";
 }
 
-function items(p, git) {
+// The space holding a pane, and its tabs other than the pane's own.
+function otherTabs(paneId) {
+  const pane = panes().find((x) => x.pane === paneId);
+  const space = pane && spaces().find((s) => (s.tabs ?? []).some((t) => t.id === pane.tab));
+  return space ? space.tabs.filter((t) => t.id !== pane.tab) : [];
+}
+
+// "Move to tab…": the destinations for one terminal.
+function moveItems(tg) {
+  return [
+    ...otherTabs(tg.pane).map((t) => [`Tab ${t.name}`, "move-to", { terminal: tg.terminal, tab: t.id }]),
+    ["New tab", "move-to", { terminal: tg.terminal, tab: null }],
+  ];
+}
+
+function items(p, git, mode) {
   p = p ?? {};
   const tg = p.target ?? {};
+  if (mode === "move") return moveItems(tg);
   switch (p.tab) {
     case "pane": {
       // A kept sub-agent can go back under its parent, still running.
@@ -41,6 +57,7 @@ function items(p, git) {
               ["Split right", "pane.split", { direction: "right", pane: tg.pane }],
               ["Split down", "pane.split", { direction: "down", pane: tg.pane }],
               ["Zoom", "pane.zoom", { pane: tg.pane }],
+              ...(term ? [["Move to tab…", "move", {}]] : []),
             ]
           : []),
         ...(term
@@ -80,6 +97,7 @@ function items(p, git) {
 }
 
 function menuIcon(command) {
+  if (command === "move" || command === "move-to") return "mods/workspace-chrome/layers.svg";
   const name = command.endsWith(".close") ? "x" : command.endsWith(".rename") ? "square-pen" : command.endsWith(".new") ? "plus" : command === "worktree" ? "git-branch" : command === "app.help" ? "terminal" : command === "app.theme" ? "settings" : command === "pane.split" ? "panel-right" : command === "pane.zoom" ? "square" : "terminal";
   return `mods/workspace-chrome/${name}.svg`;
 }
@@ -109,16 +127,60 @@ export default class Menu extends View {
   }
 
   choose(i, cx) {
-    const it = items(props(), this.git)[i];
+    const it = items(props(), this.git, this.mode)[i];
     if (!it) return;
+    // "Move to tab…" swaps this popup's list for the destinations.
+    if (it[1] === "move") {
+      this.mode = "move";
+      this.at = 0;
+      cx.notify();
+      return;
+    }
+    if (it[1] === "move-to") {
+      this.move(it[2], cx);
+      return;
+    }
     closeOverlay(props()?.overlay);
     if (it[1] === "worktree") openOverlay({ mod: "worktree", kind: "dialog", ...(it[2].action === "open" ? { width: 560, height: 480 } : { width: 440, height: 260 }), props: it[2] });
     else run(it[1], it[2]);
   }
 
+  // Take the pane away (the program keeps running), then give it one beside
+  // the destination tab's focused pane, or a tab of its own. Parking is
+  // pending until the core replies, and keep fails ("no running terminal")
+  // until the app has caught up, so wait for the app's own view to show it
+  // parked, then keep until a pane for it appears. The popup stays open
+  // meanwhile: closing it would cancel this task.
+  move({ terminal, tab }, cx) {
+    if (this.moving) return;
+    this.moving = true;
+    cx.notify();
+    run("terminal.park", { terminal });
+    cx.spawn(async (cx) => {
+      const term = () => terminals().find((x) => x.address === terminal);
+      const hasPane = () => panes().some((p) => p.terminal === terminal);
+      const parked = () => term() && !term().labels?.["herdr.tab"] && !hasPane();
+      for (let n = 0; n < 50 && !parked(); n++) await cx.sleep(100);
+      if (!parked()) {
+        notify({ title: "Move to tab", body: `${terminal} didn't leave its tab.`, level: "error" });
+      } else {
+        for (let n = 0; n < 5 && !hasPane(); n++) {
+          if (tab) {
+            run("tab.select", { id: tab });
+            run("terminal.keep", { terminal, place: "right" });
+          } else run("terminal.keep", { terminal, place: "tab" });
+          for (let w = 0; w < 10 && !hasPane(); w++) await cx.sleep(100);
+        }
+        if (!hasPane()) notify({ title: "Move to tab", body: `${terminal} is still running but has no pane; find it in the agents list or with hc ls.`, level: "error" });
+      }
+      closeOverlay(props()?.overlay);
+    });
+  }
+
   render(cx) {
     const t = theme();
-    const list = items(props(), this.git);
+    if (this.moving) return v_flex().id("menu").w_full().p(12).bg(t.popover).text_size(12.8).text_color(t.muted).child("Moving…");
+    const list = items(props(), this.git, this.mode);
     return v_flex()
       .id("menu")
       .track_focus(this.handle)

@@ -183,5 +183,6 @@
   "traffic_lights": [
     12,
     16
-  ]
+  ],
+  "terminal_menu": "my-menu"
 }

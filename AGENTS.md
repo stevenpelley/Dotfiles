@@ -84,6 +84,16 @@ ssh disconnects but not VM restarts).
   as `~/.claude/statusline-command.sh` (`link_claude_statusline`); needs `jq`
 - `config/zellij` — Zellij config
 - `config/ghostty` — Ghostty terminal config
+- `config/herdr-app` — the Herdr app's home (`~/.config/herdr-app`). Herdr
+  writes most of this folder itself (shipped mods/layouts, `AGENTS.md`,
+  `.d.ts`, view/shared state, its socket), so its `.gitignore` is an
+  allowlist: `keys.json`, `settings.json`, `programs.json`, own themes,
+  `layouts/my-*.json`, `mods/my-*/`. Shipped layouts and mods are read-only
+  (replaced on every start); changes go in `my-*` clones (`layout.clone`,
+  `mod.clone`). Read the folder's `AGENTS.md` (written by Herdr) before
+  editing; run `herdr-app check <mod folder>` after each mod change.
+  `install.sh link` carries over the app's untracked state when it replaces
+  an existing folder; quit Herdr first
 
 ## Commands and verification
 

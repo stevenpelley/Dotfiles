@@ -47,7 +47,7 @@ link_configs() {
   olddir=~/Dotfiles_old             # old dotfiles backup directory
   oldconfigdir=~/Config_old
   files="bashrc vimrc bash_profile profile sbxenv.yaml"    # list of files/folders to symlink in homedir
-  config_dirs="bash nvim zellij ghostty"
+  config_dirs="bash nvim zellij ghostty herdr-app"
 
   ##########
 
@@ -94,6 +94,14 @@ link_configs() {
       rm ~/.config/$configdir
     elif [ -e ~/.config/$configdir ]
     then
+      # The Herdr app keeps its own state in its folder too (window spot,
+      # layout clicks, shared mod state); the repo tracks only an allowlist.
+      # Carry over what the repo doesn't have before backing the folder up.
+      # Quit Herdr first: it writes there while running.
+      if [ "$configdir" = herdr-app ]; then
+        rsync -a --ignore-existing --exclude /.git --exclude /herdr-app.sock \
+          ~/.config/$configdir/ $dir/config/$configdir/
+      fi
       mv ~/.config/$configdir $oldconfigdir/
     fi
 

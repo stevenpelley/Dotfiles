@@ -17,6 +17,13 @@ IFS=$'\x1f' read -r cwd model ctx_used ctx_size ctx_pct h5_pct h5_reset d7_pct d
     (.rate_limits.spend_limit.resets_at // "")
   ] | map(tostring) | join("\u001f")')
 
+# In a herdr-core terminal, publish context size as labels on this terminal
+# (hc get/ls/events show them). Detached with every stream closed, so a slow
+# or unreachable core never holds up the status line.
+if [ -n "$HC_TERMINAL_ID" ] && [ -n "$ctx_used" ] && command -v hc >/dev/null; then
+  hc label "$HC_TERMINAL_ID" ctx="$ctx_used" ctx_size="$ctx_size" >/dev/null 2>&1 </dev/null &
+fi
+
 user=$(whoami)
 dir="$cwd"
 case "$dir" in "$HOME"*) dir="~${dir#$HOME}";; esac

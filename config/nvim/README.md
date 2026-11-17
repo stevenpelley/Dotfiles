@@ -13,9 +13,12 @@ hierarchy, diffs) without the IDE. Plain `nvim` uses this config.
   any brew/apt nvim is uninstalled so only the pinned one remains.
 - `tree-sitter` CLI (pinned `TREE_SITTER_VERSION`, installed by `install.sh`
   into `~/.local/bin`), `curl`, `tar` and a C compiler — nvim-treesitter's
-  main branch uses them to build parsers on first run.
+  main branch uses them to build parsers. `install.sh` builds the parsers
+  listed in `treesitter-languages` (and restores the plugins from
+  `lazy-lock.json`), so the sandbox kit image ships them prebuilt.
 - `pyright` + `ruff` (Python), `vtsls` (TypeScript/JS) on PATH — installed
-  automatically by `install.sh` (npm / pipx / brew).
+  automatically by `install.sh` (brew on macOS; on Linux a private node for
+  the LSPs and uv tools for ruff).
 - `git` (lazy.nvim clones plugins)
 - `lazygit` (optional, for `<leader>gg`)
 

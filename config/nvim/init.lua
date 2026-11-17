@@ -44,9 +44,21 @@ require("lazy").setup({
     lazy = false, -- lazy-loading is unsupported
     build = ":TSUpdate",
     config = function()
-      local ts_langs = { "python", "typescript", "tsx", "javascript", "lua", "vim", "vimdoc", "markdown", "bash" }
-      -- async, and a no-op for parsers that are already installed
-      require("nvim-treesitter").install(ts_langs)
+      -- one language per line; install.sh prebuilds the same list
+      local ts_langs = vim.tbl_filter(function(l)
+        return l ~= "" and not l:match("^#")
+      end, vim.tbl_map(vim.trim, vim.fn.readfile(vim.fn.stdpath("config") .. "/treesitter-languages")))
+      -- async, and a no-op for parsers that are already installed.
+      -- DOTFILES_TS_INSTALL is set by install.sh's headless runs: "skip" while
+      -- it restores plugins, "wait" to install and update parsers synchronously.
+      local ts_mode = vim.env.DOTFILES_TS_INSTALL
+      if ts_mode ~= "skip" then
+        local task = require("nvim-treesitter").install(ts_langs)
+        if ts_mode == "wait" then
+          task:wait(900000)
+          require("nvim-treesitter").update(ts_langs):wait(900000)
+        end
+      end
       -- highlighting is Neovim's own; the plugin only supplies parsers/queries.
       -- pcall: filetypes without an installed parser just keep regex syntax.
       vim.api.nvim_create_autocmd("FileType", {

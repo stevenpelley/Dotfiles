@@ -1,0 +1,11 @@
+# Treesitter parsers installed by config/nvim/init.lua and prebuilt by
+# install.sh (install_nvim_plugins), one language per line.
+python
+typescript
+tsx
+javascript
+lua
+vim
+vimdoc
+markdown
+bash

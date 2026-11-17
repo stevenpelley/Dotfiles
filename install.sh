@@ -11,10 +11,16 @@
 #   bash install.sh instructions  # only the agent-instructions links
 #   bash install.sh scripts  # only bin/* (copied to ~/.local/share/dotfiles/bin,
 #                            # linked from ~/.local/bin); link also does this
-#   bash install.sh install  # install tooling (gh + gh-stack extension, pinned nvim + tree-sitter CLI, LSPs,
-#                            # zellij, lefthook, oh-my-bash, pipx tools)
-#   bash install.sh all      # install then link (order matters: oh-my-bash
+#   bash install.sh install  # install missing tooling (gh + gh-stack extension, pinned nvim + tree-sitter CLI,
+#                            # LSPs, Python tools, zellij, lefthook, oh-my-bash, nvim plugins + parsers)
+#   bash install.sh upgrade  # move the unpinned tools (brew formulas, uv tools, LSP npm packages,
+#                            # gh extensions) to their latest releases
+#   bash install.sh all      # install, link, then the nvim plugins (order matters: oh-my-bash
 #                            # replaces ~/.bashrc, so linking must come after)
+#
+# install and all only install what is missing or not at its pinned version.
+# When everything is there they make no network calls, so they are cheap to
+# run at every sandbox create (the sbx kit image already has it all).
 #
 # link moves any pre-existing files to ~/Dotfiles_old / ~/Config_old, then
 # creates symlinks. Safe to re-run.
@@ -314,6 +320,21 @@ TREE_SITTER_VERSION=v0.27.0
 # 5xx from the API used to fail a whole kit image build.
 ZELLIJ_VERSION=v0.45.1
 LEFTHOOK_VERSION=v2.2.2
+# gh from its GitHub release tarball where there is no brew (gh-stack needs a
+# recent gh; distro packages lag far behind).
+GH_VERSION=v2.104.0
+# Where there is no brew, the Python tools and the Node.js language servers
+# run on a private uv and node under ~/.local/opt, not on whatever python3 or
+# node the machine has: a Docker sandbox kit image built with one base must
+# keep working on any workload, and those differ in both. They are not put on
+# PATH; the tools they install are.
+UV_VERSION=0.13.9
+UV_TOOLS_PYTHON=3.13
+NODE_VERSION=v26.13.1
+PYTHON_TOOLS="jc jello jellex ruff"
+LSP_NPM_PACKAGES="pyright @vtsls/language-server typescript"
+LSP_BINS="pyright pyright-langserver vtsls"
+LSP_PREFIX=~/.local/share/dotfiles/lsp
 
 # release-asset OS name, shared by the neovim and tree-sitter release naming
 release_os() {
@@ -321,6 +342,16 @@ release_os() {
     Darwin) echo macos ;;
     Linux)  echo linux ;;
     *)      return 1 ;;
+  esac
+}
+
+# Release-asset architecture: x64 or arm64 (nvim and uv name them otherwise and
+# map it themselves).
+release_arch() {
+  case "$(uname -m)" in
+    x86_64)          echo x64 ;;
+    aarch64 | arm64) echo arm64 ;;
+    *)               return 1 ;;
   esac
 }
 
@@ -424,23 +455,126 @@ install_tree_sitter() {
   ~/.local/bin/tree-sitter --version
 }
 
-install_lsps() {
-  # the nvim config needs pyright, vtsls (+ typescript) and ruff on PATH
-  if ! which pyright-langserver > /dev/null; then
-    if which brew > /dev/null; then
-      brew install pyright
-    elif which npm > /dev/null; then
-      npm install -g pyright
-    else
-      echo "install_lsps: no brew/npm; cannot install pyright"
+# Private uv and node (see UV_VERSION, NODE_VERSION) ---------------------------
+UV_DIR=~/.local/opt/uv-${UV_VERSION}
+NODE_DIR=~/.local/opt/node-${NODE_VERSION}
+
+install_uv() {
+  if [ -x "$UV_DIR/uv" ] && [ "$("$UV_DIR/uv" --version | awk '{print $2}')" = "$UV_VERSION" ]; then
+    return 0
+  fi
+  local os arch
+  case "$(uname -s)" in
+    Linux)  os=unknown-linux-gnu ;;
+    Darwin) os=apple-darwin ;;
+    *) echo "uv: unsupported OS $(uname -s), skipping"; return 1 ;;
+  esac
+  case "$(uname -m)" in
+    x86_64)          arch=x86_64 ;;
+    aarch64 | arm64) arch=aarch64 ;;
+    *) echo "uv: unsupported arch $(uname -m), skipping"; return 1 ;;
+  esac
+  mkdir -p "$UV_DIR"
+  if ! fetch "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${arch}-${os}.tar.gz" |
+    tar xz -C "$UV_DIR" --strip-components=1; then
+    echo "uv: download/extract of ${UV_VERSION} failed"
+    return 1
+  fi
+  "$UV_DIR/uv" --version
+}
+
+install_node() {
+  if [ -x "$NODE_DIR/bin/node" ] && [ "$("$NODE_DIR/bin/node" --version 2> /dev/null)" = "$NODE_VERSION" ]; then
+    return 0
+  fi
+  local os arch
+  case "$(uname -s)" in
+    Linux)  os=linux ;;
+    Darwin) os=darwin ;;
+    *) echo "node: unsupported OS $(uname -s), skipping"; return 1 ;;
+  esac
+  arch=$(release_arch) || { echo "node: unsupported arch $(uname -m), skipping"; return 1; }
+  mkdir -p "$NODE_DIR"
+  # bin/ and lib/ (npm) only: include/ (headers node-gyp fetches on demand)
+  # and share/ (docs) are most of the tarball
+  local top="node-${NODE_VERSION}-${os}-${arch}"
+  if ! fetch "https://nodejs.org/dist/${NODE_VERSION}/${top}.tar.gz" |
+    tar xz -C "$NODE_DIR" --strip-components=1 "$top/bin" "$top/lib"; then
+    echo "node: download/extract of ${NODE_VERSION} failed"
+    return 1
+  fi
+  # arm64 Linux builds link libatomic.so.1, which minimal images lack (the
+  # sbx kit image ships one next to node; see sbx/dotfiles/dotfiles.dockerfile)
+  "$NODE_DIR/bin/node" --version ||
+    { echo "node: ${NODE_VERSION} does not run here (arm64 Linux needs libatomic.so.1)"; return 1; }
+}
+
+# Python CLI tools (PYTHON_TOOLS): pipx from brew, else uv tools on a
+# uv-managed Python, so the tools do not depend on the machine's python3. A
+# tool counts as installed when its entry point exists and its venv's python
+# runs (a venv left by pipx, or built against another python3, gets replaced).
+install_python_tools() {
+  local t missing=""
+  if command -v brew > /dev/null; then
+    for t in $PYTHON_TOOLS; do
+      command -v "$t" > /dev/null || missing="$missing $t"
+    done
+    [ -n "$missing" ] || return 0
+    command -v pipx > /dev/null || brew install pipx
+    pipx install $missing
+    return
+  fi
+  install_uv
+  local uv="$UV_DIR/uv" tools bin
+  tools=$("$uv" tool dir)
+  bin=$("$uv" tool dir --bin)
+  for t in $PYTHON_TOOLS; do
+    if [ -x "$bin/$t" ] && "$tools/$t/bin/python" -c '' 2> /dev/null; then
+      continue
     fi
+    echo "python tools: installing $t (uv, Python ${UV_TOOLS_PYTHON})"
+    "$uv" tool uninstall "$t" > /dev/null 2>&1 || true
+    "$uv" tool install --force --managed-python --python "$UV_TOOLS_PYTHON" "$t"
+  done
+}
+
+# The nvim config needs pyright, vtsls (+ typescript) and ruff (a Python tool)
+# on PATH. With brew: brew's pyright, vtsls from any npm. Otherwise the npm
+# packages go into LSP_PREFIX with the private node, and each of LSP_BINS gets
+# a ~/.local/bin wrapper that runs it on that node (their #!/usr/bin/env node
+# would pick whatever node is on PATH, if any).
+lsp_wrapper() {
+  printf '#!/bin/sh\n# Written by ~/Dotfiles/install.sh (install_lsps)\nexec %s %s "$@"\n' \
+    "'$NODE_DIR/bin/node'" "'$LSP_PREFIX/node_modules/.bin/$1'"
+}
+
+install_lsps() {
+  if command -v brew > /dev/null; then
+    command -v pyright-langserver > /dev/null || brew install pyright
+    if ! command -v vtsls > /dev/null && command -v npm > /dev/null; then
+      npm install -g @vtsls/language-server typescript
+    fi
+    return
   fi
-  if ! which vtsls > /dev/null && which npm > /dev/null; then
-    npm install -g @vtsls/language-server typescript
-  fi
-  if ! which ruff > /dev/null && which pipx > /dev/null; then
-    pipx install ruff
-  fi
+  install_node
+  local b
+  for b in $LSP_BINS; do
+    if [ ! -e "$LSP_PREFIX/node_modules/.bin/$b" ]; then
+      echo "lsps: installing $LSP_NPM_PACKAGES into $LSP_PREFIX"
+      mkdir -p "$LSP_PREFIX"
+      PATH="$NODE_DIR/bin:$PATH" npm --prefix "$LSP_PREFIX" install --no-fund --no-audit $LSP_NPM_PACKAGES
+      break
+    fi
+  done
+  mkdir -p ~/.local/bin
+  for b in $LSP_BINS; do
+    if [ "$(cat ~/.local/bin/"$b" 2> /dev/null)" != "$(lsp_wrapper "$b")" ]; then
+      echo "lsps: writing wrapper ~/.local/bin/$b"
+      rm -f ~/.local/bin/"$b"
+      lsp_wrapper "$b" > ~/.local/bin/"$b"
+      chmod 755 ~/.local/bin/"$b"
+    fi
+  done
 }
 
 install_zellij() {
@@ -502,105 +636,127 @@ install_lefthook() {
   rm -f "$tmpfile"
   ~/.local/bin/lefthook version
 }
-ensure_linux_tooling() {
-  # best-effort bootstrap for fresh sandboxes; every apt call waits for the
-  # package lock instead of failing
+# Installs the apt package for each command that is missing. Arguments are
+# <command> or <command>:<package>. Best effort: without apt or root/sudo it
+# reports and returns. Every apt call waits for the package lock instead of
+# failing.
+ensure_apt_commands() {
   command -v apt-get > /dev/null || return 0
-  if [ "$(id -u)" = "0" ]; then
-    SUDO=""
-  elif command -v sudo > /dev/null; then
-    SUDO="sudo"
-  else
-    echo "linux tooling: no apt privileges, skipping"
-    return 0
-  fi
-  local missing=""
-  local pkg
-  for pkg in pipx git curl jq build-essential; do
-    command -v "$pkg" > /dev/null || missing="$missing $pkg"
+  local spec missing="" sudo=""
+  for spec in "$@"; do
+    command -v "${spec%%:*}" > /dev/null || missing="$missing ${spec#*:}"
   done
-  [ -z "$missing" ] && return 0
-  $SUDO apt-get update -o DPkg::Lock::Timeout=10 && \
-    $SUDO apt-get install -y -o DPkg::Lock::Timeout=10 $missing
+  [ -n "$missing" ] || return 0
+  if [ "$(id -u)" != "0" ]; then
+    if sudo -n true 2> /dev/null; then
+      sudo="sudo"
+    else
+      echo "apt: no privileges to install$missing; skipping"
+      return 0
+    fi
+  fi
+  { $sudo apt-get update -o DPkg::Lock::Timeout=10 &&
+    $sudo apt-get install -y -o DPkg::Lock::Timeout=10 $missing; } ||
+    echo "apt: could not install$missing; continuing"
 }
 
-# GitHub CLI, kept at the latest release. Ubuntu's own gh package lags far
-# behind and breaks on GraphQL deprecations, so on apt systems gh comes from
-# GitHub's apt repo (cli.github.com/packages, per docs/install_linux.md).
-# The keyring and source list are rewritten only when their content changes,
-# so re-runs are no-ops apart from the apt update/upgrade.
+# GitHub CLI: brew's where there is brew, otherwise the release tarball pinned
+# by GH_VERSION into ~/.local/opt/gh-<version>, linked as ~/.local/bin/gh
+# (which comes first on PATH, ahead of a distro or image gh).
+gh_pinned_ok() {
+  [ -x ~/.local/bin/gh ] &&
+    [ "$(~/.local/bin/gh --version | sed -n '1s/^gh version \([^ ]*\).*/\1/p')" = "${GH_VERSION#v}" ]
+}
+
 install_gh() {
   if command -v brew > /dev/null; then
-    if brew list --formula gh > /dev/null 2>&1; then
-      brew upgrade gh
-    else
-      brew install gh
-    fi
+    brew list --formula gh > /dev/null 2>&1 || brew install gh
     return
   fi
-  if ! command -v apt-get > /dev/null; then
-    echo "gh: no brew or apt-get; install it manually (https://github.com/cli/cli#installation)"
-    return 1
-  fi
-  local sudo=""
-  if [ "$(id -u)" != "0" ]; then
-    if ! command -v sudo > /dev/null; then
-      echo "gh: no apt privileges, skipping"
+  if ! gh_pinned_ok; then
+    local arch dest
+    [ "$(uname -s)" = Linux ] || { echo "gh: no brew and not Linux; install it manually"; return 1; }
+    case "$(uname -m)" in
+      x86_64)          arch=amd64 ;;
+      aarch64 | arm64) arch=arm64 ;;
+      *) echo "gh: unsupported arch $(uname -m), skipping"; return 1 ;;
+    esac
+    dest=~/.local/opt/gh-${GH_VERSION}
+    mkdir -p "$dest" ~/.local/bin
+    if ! fetch "https://github.com/cli/cli/releases/download/${GH_VERSION}/gh_${GH_VERSION#v}_linux_${arch}.tar.gz" |
+      tar xz -C "$dest" --strip-components=1; then
+      echo "gh: download/extract of ${GH_VERSION} failed"
       return 1
     fi
-    sudo="sudo"
+    ln -sfn "$dest/bin/gh" ~/.local/bin/gh
   fi
-  local keyring=/etc/apt/keyrings/githubcli-archive-keyring.gpg
-  local list=/etc/apt/sources.list.d/github-cli.list
-  local tmp source
-  tmp=$(mktemp)
-  if ! fetch https://cli.github.com/packages/githubcli-archive-keyring.gpg > "$tmp"; then
-    echo "gh: could not download the apt signing key"
-    rm -f "$tmp"
-    return 1
-  fi
-  if ! cmp -s "$tmp" "$keyring"; then
-    echo "gh: installing apt signing key $keyring"
-    $sudo install -D -m 644 "$tmp" "$keyring" || { rm -f "$tmp"; return 1; }
-  fi
-  rm -f "$tmp"
-  source="deb [arch=$(dpkg --print-architecture) signed-by=$keyring] https://cli.github.com/packages stable main"
-  if [ "$(cat "$list" 2> /dev/null)" != "$source" ]; then
-    echo "gh: writing apt source $list"
-    $sudo install -d -m 755 "$(dirname "$list")" &&
-      echo "$source" | $sudo tee "$list" > /dev/null || return 1
-  fi
-  # install upgrades gh to the repo's latest when it is already installed
-  $sudo apt-get update -o DPkg::Lock::Timeout=10 &&
-    $sudo apt-get install -y -o DPkg::Lock::Timeout=10 gh &&
-    gh --version | head -1
+  ~/.local/bin/gh --version | head -1
 }
 
-# Official gh extensions. `gh extension install` works without gh auth but
-# fails when the extension is already installed; `list` and `upgrade` need
-# auth. So detect installed extensions on disk, and upgrade only when gh is
-# authenticated (the kit's install hook may run before GH_TOKEN is set).
+# Official gh extensions, installed when missing (detected on disk: `gh
+# extension install` fails when the extension is already installed, and `list`
+# needs auth). Upgrades are `install.sh upgrade`.
 GH_EXTENSIONS="github/gh-stack"
+gh_extensions_dir() { echo "${XDG_DATA_HOME:-$HOME/.local/share}/gh/extensions"; }
+
 install_gh_extensions() {
   command -v gh > /dev/null || { echo "gh extensions: gh not installed, skipping"; return 1; }
-  local ext dir="${XDG_DATA_HOME:-$HOME/.local/share}/gh/extensions"
+  local ext
   for ext in $GH_EXTENSIONS; do
-    if [ ! -d "$dir/${ext#*/}" ]; then
+    [ -d "$(gh_extensions_dir)/${ext#*/}" ] ||
       gh extension install "$ext" || echo "gh extensions: could not install $ext"
-    elif gh auth status > /dev/null 2>&1; then
-      gh extension upgrade "${ext#*/gh-}" || echo "gh extensions: could not upgrade $ext"
-    else
-      echo "gh extensions: $ext installed; not authenticated, skipping upgrade"
-    fi
   done
+}
+
+# Neovim plugins and treesitter parsers --------------------------------------
+# Plugins at the commits in config/nvim/lazy-lock.json and a parser for each
+# language in config/nvim/treesitter-languages, so the first nvim start needs
+# no network and no C compiler (sandbox workloads have none; the kit image
+# builds them). Restoring checks the plugins out at the lockfile's commits.
+NVIM_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/nvim"
+
+treesitter_languages() {
+  grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' ~/.config/nvim/treesitter-languages
+}
+
+nvim_plugins_ok() {
+  local lock=~/.config/nvim/lazy-lock.json name commit lang
+  [ -f "$lock" ] && command -v jq > /dev/null || return 1
+  while read -r name commit; do
+    [ "$(git -C "$NVIM_DATA/lazy/$name" rev-parse HEAD 2> /dev/null)" = "$commit" ] || return 1
+  done < <(jq -r 'to_entries[] | "\(.key) \(.value.commit)"' "$lock")
+  while read -r lang; do
+    [ -f "$NVIM_DATA/site/parser/$lang.so" ] || return 1
+  done < <(treesitter_languages)
+}
+
+install_nvim_plugins() {
+  if [ ! -f ~/.config/nvim/init.lua ]; then
+    echo "nvim plugins: ~/.config/nvim is not linked yet; skipping (run 'bash install.sh all')"
+    return 0
+  fi
+  nvim_plugins_ok && return 0
+  ensure_apt_commands cc:build-essential
+  command -v cc > /dev/null || echo "nvim plugins: no C compiler; treesitter parsers cannot be built"
+  # DOTFILES_TS_INSTALL (read by config/nvim/init.lua): skip the parser install
+  # while restoring, then wait for it in a second run
+  echo "nvim: restoring plugins from lazy-lock.json"
+  DOTFILES_TS_INSTALL=skip ~/.local/bin/nvim --headless "+Lazy! restore" +qa
+  echo "nvim: installing treesitter parsers"
+  DOTFILES_TS_INSTALL=wait ~/.local/bin/nvim --headless +qa
+  if ! nvim_plugins_ok; then
+    echo "nvim plugins: plugins or parsers still missing after install"
+    return 1
+  fi
 }
 
 install_commons() {
-  ensure_linux_tooling
+  ensure_apt_commands git curl jq
   install_gh
   install_gh_extensions
   install_nvim
   install_tree_sitter
+  install_python_tools
   install_lsps
   install_zellij
   install_lefthook
@@ -612,13 +768,37 @@ install_commons() {
     omb_installer=$(fetch https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)
     bash -c "$omb_installer" --unattended
   fi
+}
 
-  # if have python then install jc, jello, jellex
-  if which python3 > /dev/null && which brew > /dev/null; then
-    brew install pipx
-    pipx install jc jello jellex ruff
-  elif which pip3 > /dev/null; then
-    pipx install jc jello jellex ruff
+# Moves the unpinned tools to their latest releases. The pinned ones (nvim,
+# tree-sitter, zellij and lefthook from GitHub, gh, uv, node) change only with
+# their *_VERSION above, and nvim plugins only with lazy-lock.json.
+upgrade_tools() {
+  local f ext
+  if command -v brew > /dev/null; then
+    for f in gh pyright zellij lefthook pipx; do
+      ! brew list --formula "$f" > /dev/null 2>&1 || brew upgrade "$f"
+    done
+    ! command -v pipx > /dev/null || pipx upgrade-all
+  else
+    if [ -x "$UV_DIR/uv" ]; then
+      "$UV_DIR/uv" tool upgrade --all
+    fi
+    if [ -x "$NODE_DIR/bin/node" ] && [ -d "$LSP_PREFIX" ]; then
+      # shellcheck disable=SC2046 # one word per package
+      PATH="$NODE_DIR/bin:$PATH" npm --prefix "$LSP_PREFIX" install --no-fund --no-audit \
+        $(printf '%s@latest ' $LSP_NPM_PACKAGES)
+    fi
+  fi
+  if command -v gh > /dev/null; then
+    if gh auth status > /dev/null 2>&1; then
+      for ext in $GH_EXTENSIONS; do
+        [ ! -d "$(gh_extensions_dir)/${ext#*/}" ] ||
+          gh extension upgrade "${ext#*/gh-}" || echo "gh extensions: could not upgrade $ext"
+      done
+    else
+      echo "gh extensions: not authenticated, skipping upgrade"
+    fi
   fi
 }
 
@@ -637,11 +817,16 @@ case "$1" in
     ;;
   install)
     install_commons
+    install_nvim_plugins
+    ;;
+  upgrade)
+    upgrade_tools
     ;;
   all)
     # must install oh-my-bash before bashrc so that my bashrc overwrites the
-    # oh-my-bash one
+    # oh-my-bash one; nvim plugins need the linked config
     install_commons
     link_configs
+    install_nvim_plugins
     ;;
 esac

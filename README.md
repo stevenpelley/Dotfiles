@@ -19,8 +19,9 @@ bash ~/Dotfiles/install.sh all
 | `bash install.sh skills` | Only the agent-skill links. |
 | `bash install.sh instructions` | Only the agent-instructions links. |
 | `bash install.sh scripts` | Only the scripts in `bin/`: each is copied to `~/.local/share/dotfiles/bin/` and linked from `~/.local/bin/` (`link` does this too). Re-run after editing one. |
-| `bash install.sh install` | Installs tooling: Neovim pinned to an exact release (`NVIM_VERSION`) plus the tree-sitter CLI, installed identically on macOS and Linux from GitHub release tarballs into `~/.local` (any brew/apt nvim is uninstalled; see [config/nvim/README.md](config/nvim/README.md)), the LSP servers, [zellij](https://zellij.dev) (brew on macOS; on Linux the static musl binary from GitHub releases into `~/.local/bin`), lefthook, oh-my-bash, and pipx tools (`jc`, `jello`, `jellex`). |
-| `bash install.sh all` | `install` then `link`, in that order. |
+| `bash install.sh install` | Installs missing tooling: Neovim pinned to an exact release (`NVIM_VERSION`) plus the tree-sitter CLI, installed identically on macOS and Linux from GitHub release tarballs into `~/.local` (any brew/apt nvim is uninstalled; see [config/nvim/README.md](config/nvim/README.md)), gh with gh-stack, the LSP servers, [zellij](https://zellij.dev), lefthook, oh-my-bash, the Python tools (`jc`, `jello`, `jellex`, `ruff`), and the nvim plugins and treesitter parsers. macOS uses brew; Linux uses pinned release binaries under `~/.local`, with a private uv (Python tools) and node (LSPs). Only what is missing or off its pin is installed, so a re-run is a fast no-op. |
+| `bash install.sh upgrade` | Moves the unpinned tools (brew formulas, pipx/uv tools, LSP npm packages, gh extensions) to their latest releases. |
+| `bash install.sh all` | `install`, then `link`, then the nvim plugins and parsers. |
 
 Order matters: the oh-my-bash installer replaces `~/.bashrc` with its own file,
 so `link` must run *after* it — which is why `all` exists. Re-run `link`
@@ -108,14 +109,17 @@ This repo is also a [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/)
 **v3 mixin kit** (`sbx/dotfiles/dotfiles.yaml` + `dotfiles.dockerfile`): the
 kit image clones this repository into `/home/agent/Dotfiles` and runs
 `install.sh all` at build time, so sbx caches the result and a sandbox create
-downloads nothing for it. A startup hook fast-forwards the clone and re-runs
+downloads nothing for it. The image is workload-neutral: it is built on plain
+Ubuntu 24.04, and every tool is a release binary under `~/.local` (with a
+private uv for the Python tools and node for the LSPs), so it works with any
+agent workload that has glibc 2.39+ and an `agent` user (tested with
+`sbx/kiro`, `sbx/claude` and `docker/sandbox-templates:shell`). The install
+hook still runs `install.sh all`, which only installs what is missing and so
+returns in about a second. A startup hook fast-forwards the clone and re-runs
 `install.sh link` on every boot (link must run after the agents' context dirs
 and CLIs exist, or it misses harnesses). Nothing is duplicated — the image is
 built from git, so upgrades inside an existing sandbox stay
-`git pull && bash install.sh link` (or a restart). The image is built on the
-Ubuntu sandbox template; on a workload where its tools do not run (another
-python3), the install hook falls back to `install.sh install` in the sandbox.
-After changing install.sh's pins, bump the kit's `version` so the next create
+`git pull && bash install.sh link` (or a restart). After changing install.sh's pins, bump the kit's `version` so the next create
 rebuilds the image.
 
 ```bash
@@ -131,17 +135,13 @@ sbx kit inspect ./sbx/dotfiles
 `sbxenv.yaml` is linked as `~/.sbxenv.yaml`, which sbx merges into every
 environment file, adding the kit as
 `git+https://github.com/stevenpelley/Dotfiles#ref=main&dir=sbx/dotfiles`.
-v3 kits compose only with v3 kits, so those environments must use a v3
-workload (e.g. `docker.io/docker/sbx-kit-kiro` with `agent: sbx-kit-kiro`)
-rather than a built-in agent shortcut like `kiro`.
 
 The image build runs on the host, outside the sandbox policy. The kit's
 `network-policy@1` hosts must still cover everything `install.sh` downloads,
 in both the `install` phase (the fallback above) and the `runtime` phase
-(in-sandbox upgrades): github.com, api.github.com, both GitHub asset hosts,
-codeload.github.com, raw.githubusercontent.com, pypi.org,
-files.pythonhosted.org, registry.npmjs.org, plus the Ubuntu apt mirrors for
-install. Kit install hooks run as **root** — the descriptor drops to the
+(`install.sh upgrade`, nvim plugin updates): github.com, api.github.com, both
+GitHub asset hosts, codeload.github.com, raw.githubusercontent.com, pypi.org,
+files.pythonhosted.org, nodejs.org and registry.npmjs.org. Kit install hooks run as **root** — the descriptor drops to the
 `agent` user before running the installer.
 
 When editing `install.sh` or adding download steps: every apt-get invocation

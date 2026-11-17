@@ -18,28 +18,34 @@ ssh disconnects but not VM restarts).
   login shell, interactive or not: `su -l`, `bash -l -c`) and by
   `config/bash/bashrc`; idempotent. `bashrc` keeps its interactive guard, so
   anything a script or kit hook needs belongs in `env`, not `bashrc`
-- `install.sh` — `link` (symlinks), `install` (tooling: gh and gh extensions (`GH_EXTENSIONS`), zellij, lefthook, oh-my-bash, pipx tools), `all`
+- `install.sh` — `link` (symlinks), `install` (missing tooling only: gh and gh extensions (`GH_EXTENSIONS`), nvim, tree-sitter, LSPs, Python tools, zellij, lefthook, oh-my-bash, nvim plugins + parsers), `upgrade` (unpinned tools to latest), `all`
 - `sbx/dotfiles/dotfiles.yaml` + `dotfiles.dockerfile` — Docker Sandboxes
-  **v3** mixin kit. The image build clones this repo into
-  `/home/agent/Dotfiles` and runs `install.sh all` as the `agent` user on
-  `docker/sandbox-templates:shell`; the overlay is `/home/agent`,
-  `/usr/local/share/npm-global` (LSPs) and `/usr/local/bin/gh`, cached by
-  sbx, so a create no longer runs the installer. The install hook only sets
-  the login shell, and runs `install.sh install` if the image's tools do not
-  run on the workload; a startup hook pulls the clone and re-runs
-  `install.sh link` every boot (log: `~/.cache/dotfiles-link.log`). After
-  changing a pin in `install.sh`, bump the kit `version` so sbx rebuilds.
-  No files are duplicated — the repo stays the single source of truth.
+  **v3** mixin kit, **workload-neutral** (used with sbx/kiro and sbx/claude).
+  The image build clones this repo into `/home/agent/Dotfiles` and runs
+  `install.sh all` as `agent` on plain `ubuntu:24.04` (glibc 2.39, the
+  tree-sitter CLI's minimum); the overlay is `/home/agent` only. Every tool is
+  a release binary under `~/.local`, Python tools are uv tools on a private uv
+  and uv-managed Python, the LSPs run on a private node (`~/.local/opt`, with
+  `libatomic.so.1` and an rpath patched in for arm64), and the nvim plugins
+  and treesitter parsers are prebuilt (workloads have no C compiler). The
+  build checks that `install.sh install` is a no-op offline and that the
+  tools run without the build-only packages. The install hook sets the login
+  shell and runs `install.sh all` (log: `~/.cache/dotfiles-install.log`); a
+  startup hook pulls the clone and re-runs `install.sh link` every boot (log:
+  `~/.cache/dotfiles-link.log`). After changing a pin in `install.sh`, bump
+  the kit `version` so sbx rebuilds. Never make the overlay depend on the
+  workload's packages (python3, node, apt state, /usr/local).
   `sbxenv.yaml` is the user-home env file for Docker Sandboxes, linked as
   `~/.sbxenv.yaml` (the sandbox only reads the dot-prefixed name — it is not
   picked up as `~/sbxenv.yaml`); it references the kit as
   `git+https://github.com/stevenpelley/Dotfiles#ref=main&dir=sbx/dotfiles`.
 - The kit follows the [v3 spec](https://github.com/docker/sandbox-kit-spec).
-  v3 kits compose only with a v3 workload (e.g. `docker.io/docker/sbx-kit-kiro`)
-  and v3 mixins — not with built-in agent shortcuts like `kiro`. Validate with
-  `docker buildx build sbx/dotfiles -f sbx/dotfiles/dotfiles.yaml --output
-  type=cacheonly` (`sbx kit validate` does not accept v3 source kits; use
-  `sbx kit inspect ./sbx/dotfiles` host-side).
+  Validate with `docker buildx build sbx/dotfiles -f
+  sbx/dotfiles/dotfiles.yaml --output type=cacheonly` (`sbx kit validate`
+  does not accept v3 source kits; use `sbx kit inspect ./sbx/dotfiles`
+  host-side). Both build from GitHub at `ref`, so test unpushed changes by
+  building `dotfiles.dockerfile` with the `ADD` of the repo replaced by
+  `COPY --from=dotfiles` and `--build-context dotfiles=.`.
 - `config/nvim` — Neovim config for LSP-based code reading; plain `nvim`
   uses it (this used to be the `config/nvim-trial` experiment). See its
   README and the comments in `init.lua`
@@ -89,8 +95,10 @@ ssh disconnects but not VM restarts).
 
 - `bash install.sh link` — re-run after adding files; moves pre-existing files
   to `~/Dotfiles_old` / `~/Config_old`
-- `bash install.sh install` — tooling; idempotent-ish (zellij install is
-  skipped if already on PATH)
+- `bash install.sh install` — tooling; installs only what is missing or off
+  its pin, so with everything present it makes no network calls (the kit
+  image build asserts this). Keep every new step's "already installed" check
+  offline and cheap; network upgrades belong in `upgrade_tools`
 - Verify before committing:
   - shells: `bash -n install.sh` (syntax) and `bash -i -c 'echo ok'` (sources cleanly)
   - nvim: `nvim --headless +qa` (config loads)
@@ -121,6 +129,9 @@ ssh disconnects but not VM restarts).
   apt ships ancient versions. `remove_other_nvims` uninstalls brew/apt nvim
   automatically and prints manual instructions for anything else (snap,
   AppImage, ...); old `~/.local/opt/nvim*` dirs are reported, not deleted.
+- The treesitter languages are listed in `config/nvim/treesitter-languages`,
+  read by both `init.lua` and `install.sh` (`install_nvim_plugins`, which
+  sets `DOTFILES_TS_INSTALL` for its headless runs).
 - `config/nvim` tracks nvim-treesitter's `main` branch (the rewrite), pinned
   by commit in `lazy-lock.json`. It supports only the latest stable nvim, so
   bump `NVIM_VERSION` and that commit **together** (`Lazy! update
@@ -158,7 +169,7 @@ ssh disconnects but not VM restarts).
   capability in `sbx/dotfiles/dotfiles.yaml` (currently github.com,
   api.github.com, objects.githubusercontent.com, release-assets.githubusercontent.com,
   codeload.github.com, raw.githubusercontent.com, pypi.org, files.pythonhosted.org,
-  registry.npmjs.org, cli.github.com; plus the Ubuntu apt mirrors for install only) or provisioning
+  nodejs.org, registry.npmjs.org) or provisioning
   fails on fresh sandboxes. Kit install hooks run as **root** — anything
   that must land in `/home/agent` goes through `su -l agent -c '...'`.
 

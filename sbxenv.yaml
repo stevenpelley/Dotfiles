@@ -2,10 +2,8 @@
 # `install.sh link`. sbx merges it into every environment definition, so the
 # Dotfiles kit is added to every sandbox created from an env file.
 #
-# The kit is v3 (sbx/dotfiles/dotfiles.yaml). v3 kits compose only with v3
-# kits, so every environment this merges into must use a v3 workload (for
-# example `docker.io/docker/sbx-kit-kiro` with `agent: sbx-kit-kiro`) and v3
-# mixins; a built-in agent shortcut such as `agent: kiro` is v2 and fails.
+# The kit is v3 (sbx/dotfiles/dotfiles.yaml) and workload-neutral: it works
+# with any v3 agent workload, e.g. `agent: kiro` or `agent: claude`.
 #
 # One-time host prerequisite: allowlist this kit's Git source (default is
 # Docker Hub only). The setting REPLACES the whole list, so keep existing

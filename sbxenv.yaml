@@ -14,6 +14,8 @@
 #   sbx settings set kit.allowedSources '["docker.io/","github.com/stevenpelley/"]'
 schemaVersion: "1"
 kits:
+  # installs zscaler root CA cert.
+  - "git+https://github.com/WashPost/kiro-setup-docker-sandbox-kit.git#dir=zscaler-root-ca"
   # Thin kit: clones the repo and runs install.sh all. `ref` pins the branch;
   # `dir` selects the kit directory inside the repo.
   - "git+https://github.com/stevenpelley/Dotfiles#ref=main&dir=sbx/dotfiles"

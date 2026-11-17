@@ -1,0 +1,22 @@
+# Allowlist: track only files that are ours, not what Herdr writes or ships.
+/*
+!/.gitignore
+!/keys.json
+!/settings.json
+!/programs.json
+
+# Themes: Herdr ships atom-one-dark and win98; track only our own.
+!/themes/
+/themes/atom-one-dark.json
+/themes/win98.json
+
+# Layouts and mods: only our own (my-*). Shipped ones are rewritten on start.
+!/layouts/
+/layouts/*
+!/layouts/my-*.json
+!/mods/
+/mods/*
+!/mods/my-*/
+# Herdr rewrites these in every mod folder.
+/mods/*/jsconfig.json
+/mods/*/*.d.ts

@@ -3,26 +3,23 @@
 #
 # Docker Sandboxes mixin for this Dotfiles repository. The content
 # (dotfiles.dockerfile beside this file) clones the repository and runs
-# `install.sh all` at image build, so the clone at /home/agent/Dotfiles, the
-# tools and the config symlinks arrive as a cached overlay instead of being
-# downloaded at every sandbox create. The repo stays the single source of
-# truth: nothing from it is copied into the kit, and upgrades inside a
-# running sandbox are still `git pull` + `bash install.sh link`.
+# `install.sh all` at image build, so the clone at /home/agent/Dotfiles, every
+# tool, the nvim plugins and parsers, and the config symlinks arrive as a
+# cached /home/agent overlay. The repo stays the single source of truth:
+# nothing from it is copied into the kit, and upgrades inside a running
+# sandbox are still `git pull` + `bash install.sh link`.
 #
-# Until 1.2.0 the kit was declaration-only and its install hook ran
-# `install.sh all` at every create (minutes per recreate).
-#
-# The overlay is built on the Ubuntu sandbox template
-# (docker/sandbox-templates:shell). On a workload whose python3 differs, the
-# pipx tools would not run, so the install hook checks them and falls back
-# to running `install.sh install` in the sandbox, as before.
+# Workload-neutral: the overlay is built on plain Ubuntu 24.04 with every tool
+# as a release binary under ~/.local (and a private uv and node), so it runs
+# on any v3 workload with glibc >= 2.39 and an `agent` user (uid 1000,
+# HOME=/home/agent): tested on sbx/kiro, sbx/claude and
+# docker/sandbox-templates:shell. The install hook runs `install.sh all`,
+# which only installs what is missing; on such a workload that takes under a
+# second and needs no network.
 #
 # Rebuilds: sbx rebuilds a kit when its source changes. A change to
 # install.sh's pins (or anything else outside sbx/dotfiles/) may not count
 # as one; bump `version` below to force the next create to rebuild.
-#
-# v3 kits compose only with v3 kits: use this with a v3 workload such as
-# docker.io/docker/sbx-kit-kiro, not the built-in `kiro` agent shortcut.
 #
 # Consume it from Git, selecting this directory:
 #   git+https://github.com/stevenpelley/Dotfiles#ref=main&dir=sbx/dotfiles
@@ -32,12 +29,12 @@ displayName: Personal dotfiles (stevenpelley)
 description: >-
   Clones the Dotfiles repository to /home/agent/Dotfiles and runs its installer,
   linking bash/vim/nvim/zellij configuration into $HOME. Provides oh-my-bash,
-  the Neovim config (LSP-based code reading), the zellij binary (unlock-first
-  keybind preset with Ctrl+G passthrough so coding agents can open their prompt
-  editor), lefthook, and pipx tools (jc, jello, jellex), all built into the
-  kit image. Kit upgrades inside a running sandbox are simply `git pull` in
+  Neovim with its plugins, treesitter parsers and LSPs (pyright, vtsls, ruff),
+  zellij, lefthook, gh with gh-stack, and jc/jello/jellex, all as release
+  binaries built into the kit image and independent of the workload's
+  packages. Kit upgrades inside a running sandbox are simply `git pull` in
   /home/agent/Dotfiles followed by `bash install.sh link`.
-version: "1.2.1"
+version: "2.0.0"
 sourceUrl: https://github.com/stevenpelley/Dotfiles
 # No licenses: the repository carries no license file.
 
@@ -53,25 +50,16 @@ capabilities:
     config:
       install:
         # Install hooks run as root with only the env they declare (the
-        # proxy variables, for the fallback's downloads).
+        # proxy variables, for downloads when the image is missing a tool).
+        # usermod, not chsh: the DHI images have no /etc/shells. Then the
+        # installer, which finds everything in the image and returns at once;
+        # on a workload it does not fit it installs what is missing.
         - command: |
-            # The workload (sbx-kit-kiro) creates the agent user with /bin/sh;
-            # make bash the login shell. usermod, not chsh: there is no
-            # /etc/shells in the image and chsh validates against it.
             usermod -s /usr/bin/bash agent
-            # The overlay's tools were built on the Ubuntu sandbox template.
-            # If they do not run here (another python3, a missing library),
-            # install them in the sandbox, as the kit did before 1.2.0.
-            su -l agent -c '
-              ok=1
-              for t in nvim zellij lefthook jc ruff; do
-                "$t" --version > /dev/null 2>&1 || { echo "dotfiles: $t does not run on this workload" >&2; ok=0; }
-              done
-              [ "$ok" = 1 ] || bash "$HOME/Dotfiles/install.sh" install
-            '
+            su -l agent -c 'mkdir -p "$HOME/.cache"; bash "$HOME/Dotfiles/install.sh" all > "$HOME/.cache/dotfiles-install.log" 2>&1 || { tail -40 "$HOME/.cache/dotfiles-install.log"; exit 1; }'
           user: "0"
           env: [HTTP_PROXY, HTTPS_PROXY, NO_PROXY, http_proxy, https_proxy, no_proxy]
-          description: Set agent login shell to bash; reinstall tools only if the image's do not run
+          description: Set agent login shell to bash; run install.sh all (a no-op when the image fits the workload)
       # Every boot: fast-forward the clone (the image's copy is as old as
       # the kit build), then re-run `link`. link must run after the runtime
       # writes the agents' context files (~/.claude, ~/.omp) and after the
@@ -88,55 +76,36 @@ capabilities:
   - type: com.docker.sandbox/network-policy@1
     config:
       # The image build runs on the host and needs no grant. `install` covers
-      # the install hook's fallback (`install.sh install` on a workload the
-      # image's tools do not run on); `runtime` the startup `git pull`, nvim
-      # plugin/parser updates and pipx/npm upgrades. Any new download host
-      # used by install.sh goes in both.
+      # the install hook when the image lacks something on this workload;
+      # `runtime` the startup `git pull`, nvim plugin/parser updates and
+      # `install.sh upgrade`. Any new download host used by install.sh goes
+      # in both.
       install:
-        allow:
-          # zellij/nvim/tree-sitter release downloads
-          # (api for the latest-release lookup; both GitHub asset hosts are
-          # required — GitHub rotated release downloads to release-assets.*)
+        allow: &dotfiles-hosts
+          # nvim, tree-sitter, gh, zellij, lefthook, uv and uv's Python
+          # releases (both GitHub asset hosts are required: GitHub rotated
+          # release downloads to release-assets.*), and gh extensions
           - github.com
           - api.github.com
           - objects.githubusercontent.com
           - release-assets.githubusercontent.com
-          # nvim-treesitter parser sources (github.com/<repo>/archive/<rev>.tar.gz
-          # redirects here)
+          # nvim plugin clones and nvim-treesitter parser sources
+          # (github.com/<repo>/archive/<rev>.tar.gz redirects here)
           - codeload.github.com
           # oh-my-bash installer
           - raw.githubusercontent.com
-          # pipx installs (jc, jello, jellex)
+          # uv tools (jc, jello, jellex, ruff)
           - pypi.org
           - files.pythonhosted.org
-          # pyright/vtsls/typescript via npm (install_lsps)
+          # the private node (install_node) and the LSP npm packages
+          - nodejs.org
           - registry.npmjs.org
-          # gh apt repo: signing key, package lists and .debs (install_gh)
-          - cli.github.com
-          # MIGRATION NOTE: install.sh apt-gets missing bootstrap packages
-          # (pipx, git, curl, jq, build-essential). v2 reached the Ubuntu
-          # mirrors through the runtime's default policy; v3 grants nothing
-          # unlisted, so they are explicit here (install phase only).
-          # Portless: apt mirrors may answer on 80 or 443.
-          - archive.ubuntu.com
-          - security.ubuntu.com
-          - ports.ubuntu.com
       runtime:
-        allow:
-          - github.com
-          - api.github.com
-          - objects.githubusercontent.com
-          - release-assets.githubusercontent.com
-          - codeload.github.com
-          - raw.githubusercontent.com
-          - pypi.org
-          - files.pythonhosted.org
-          - registry.npmjs.org
-          - cli.github.com
+        allow: *dotfiles-hosts
 
   # A tool mixin contributes the body only; the workload decides where the
-  # agent reads it. @1, not @2: the spec refuses to compose @1 and @2
-  # together, and docker.io/docker/sbx-kit-kiro:1.0.0 declares @1 (KIRO.md).
+  # agent reads it. @1: the spec refuses to compose @1 and @2 together, and
+  # the sbx/kiro and sbx/claude workloads accept both.
   # Inline `content` keeps the body in the descriptor.
   - type: com.docker.sandbox/agent-context@1
     config:

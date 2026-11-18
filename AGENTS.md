@@ -68,8 +68,8 @@ ssh disconnects but not VM restarts).
   `AGENTS.md`. Never link omp's `~/.omp/agent/AGENTS.md`: in a Docker sandbox
   the runtime writes the kit guidance there
 - `agents/skills/sbx-mcp-client/scripts/mcpcli` — MCP client for the sbx MCP
-  gateway (python SDK `mcp==2.3.0`, venv created on first run in
-  `~/.cache/mcpcli`); `aws-mcp` skill holds the AWS MCP / Logs Insights cost
+  gateway (python SDK `mcp==2.3.0` pinned in the script's PEP 723 metadata, run with
+  `uv run --script`); `aws-mcp` skill holds the AWS MCP / Logs Insights cost
   rules that its `logs` subcommand enforces — keep them in sync. Keep
   account IDs and org-specific profile names out (this repo is public)
 - `agents/skills/github-pr-stack/scripts/stack-ci` — `[skip ci]` marker tool
@@ -117,7 +117,8 @@ ssh disconnects but not VM restarts).
     buffer-map callback to submit (diffview loads asynchronously)
   - skill/instruction links: run `link_agent_skills` and
     `link_agent_instructions` with `HOME` pointed at a temp dir
-  - mcpcli: `python3 -m py_compile` and `mcpcli --help` (no gateway needed)
+  - mcpcli: `uv run --no-project python -m py_compile` on `mcpcli.py`, and
+    `mcpcli --help` (no gateway needed)
   - zellij: `zellij setup --check`
 
 ## Gotchas (all learned the hard way — see git log)

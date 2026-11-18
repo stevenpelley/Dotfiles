@@ -8,8 +8,8 @@ description: >-
   calling a tool, running AWS MCP Server scripts, or CloudWatch Logs Insights
   queries.
 compatibility: >-
-  Requires bash and python3 (with venv). The first run installs mcp==2.3.0
-  from pypi.org into ~/.cache/mcpcli.
+  Requires bash and uv. The first run installs mcp==2.3.0 from pypi.org
+  (and a Python, if none is installed) into uv's cache.
 ---
 
 # sbx MCP gateway client
@@ -89,11 +89,12 @@ $M spend --session <id>                   # Logs Insights spend from the session
 
 ## Files
 
-- `scripts/mcpcli` — wrapper: creates the venv on first use, runs `mcpcli.py`.
+- `scripts/mcpcli` — wrapper: runs `mcpcli.py` with `uv run --script`, which
+  installs the SDK pinned in the script's inline metadata on first use.
 - `scripts/mcpcli.py` — the client.
 - `scripts/cwl_guarded_query.py` — the script `logs` sends to
   `aws___run_script`: estimate, refuse if over the cap, run, wait at most 30s
   per call.
 
-Disk: the venv in `~/.cache/mcpcli/` and Logs Insights spend ledgers in
+Disk: the environment in uv's cache (`uv cache dir`) and Logs Insights spend ledgers in
 `/tmp/cwl-insights-ledger-<session-id>.jsonl`.

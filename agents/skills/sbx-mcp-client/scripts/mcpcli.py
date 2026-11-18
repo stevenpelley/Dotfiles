@@ -1,8 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["mcp==2.3.0"]
+# ///
 """MCP client for the sbx MCP gateway, built on the official MCP python-sdk.
 
-Run it through the `mcpcli` wrapper next to this file, which creates a venv with the pinned
-SDK (mcp==2.3.0) on first use.
+Run it through the `mcpcli` wrapper next to this file, or directly; both use
+`uv run --script`, which installs the pinned SDK from the metadata above on first use.
 
 The SDK handles the streamable-HTTP protocol: session IDs, the server->client GET stream,
 and replying to the gateway's keepalive pings (which the sbx gateway uses to decide whether
